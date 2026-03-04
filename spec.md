@@ -1,27 +1,33 @@
 # Tung Tung Tung Sahur Obby
 
 ## Current State
-A 10-stage platformer obby game with username system, leaderboard (fastest times + top players), level editor, and community levels. Usernames are stored in the backend and displayed in the HUD, start screen, and leaderboard.
+The game has a level editor and community levels system. The backend stores custom levels in a `Map<Principal, CustomLevel>`, meaning only one level can exist per user identity. When any new user publishes a level it overwrites the previous entry stored under their principal key. Since anonymous users all share the same anonymous principal, publishing overwrites the same slot every time, deleting all prior community levels.
+
+The frontend `CommunityLevels.tsx` renders levels returned by `getPublicLevels()`. The `LevelEditor.tsx` calls `saveCustomLevel()` on publish. `App.tsx` also calls `getMyLevel()` to pre-load the editor with the user's existing level.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Owner tag logic: the username `tung_master` is hardcoded as the owner
-- A helper function `isOwner(name: string): boolean` that returns true when name === "tung_master"
-- Wherever a username is displayed, if `isOwner(name)` is true, render the name in green (`#22c55e` / Tailwind `text-green-500`) with a small crown emoji prefix (👑) to distinguish the owner
+- New list-based storage in the backend: `customLevelsById : Map<Nat, CustomLevel>` keyed by unique auto-increment ID, so every published level gets its own slot regardless of who published it.
+- New query `getPublicLevels()` that returns all levels sorted newest-first (up to 100).
+- New query `getLevelById(id: Nat)` to fetch a single level.
+- New update `deleteLevel(id: Nat)` that only allows the original author (or owner) to delete.
 
 ### Modify
-- `App.tsx` — `StartScreen`: the "Playing as" badge should show the username in green with crown if owner
-- `App.tsx` — `HUD`: the username panel should show username in green with crown if owner
-- `App.tsx` — `LeaderboardSection` (mini leaderboard on win screen): apply green + crown to owner name
-- `Leaderboard.tsx` — `SpeedRow` and `TopRow`: apply green + crown to owner name when displayed
+- `saveCustomLevel` — instead of `customLevels.add(caller, newLevel)`, insert into `customLevelsById` with a new unique ID each time, so each publish creates a new entry and never overwrites existing ones.
+- `getMyLevel` — return the most recent level where `author == caller` (optional, may return null if none).
+- `deleteMyLevel` — remove the most recent level authored by caller (keep for backward-compat).
 
 ### Remove
-- Nothing removed
+- The old `Map<Principal, CustomLevel>` (`customLevels`) map.
 
 ## Implementation Plan
-1. Add a shared `OWNER_USERNAME` constant (`"tung_master"`) and `isOwner(name: string)` helper near the top of `App.tsx` (or a shared util)
-2. In `App.tsx` `StartScreen`, wrap the username span: if owner, add `👑 ` prefix and green inline style
-3. In `App.tsx` `HUD`, wrap the username display: if owner, apply green color and crown prefix
-4. In `App.tsx` `LeaderboardSection`, when rendering `displayName`, check owner and apply green style + crown
-5. In `Leaderboard.tsx` `SpeedRow` and `TopRow`, after resolving `displayName`, check if `displayName === OWNER_USERNAME` (or pass a helper) and apply green style + crown prefix
+1. Replace `let customLevels = Map.empty<Principal, CustomLevel>()` with `let customLevelsById = Map.empty<Nat, CustomLevel>()`.
+2. Update `saveCustomLevel` to insert with `nextLevelId` key, then increment `nextLevelId`.
+3. Update `getPublicLevels` to iterate `customLevelsById.values()`, sort by `createdAt` descending, return up to 100.
+4. Update `getMyLevel` to filter `customLevelsById` for entries where `author == caller`, return the most recent one.
+5. Update `deleteMyLevel` to find and remove the most recent level where `author == caller`.
+6. Add `getLevelById(id: Nat)` query.
+7. Add `deleteLevel(id: Nat)` update that checks caller is the level author.
+8. Keep all other backend logic (stats, leaderboard, usernames) unchanged.
+9. Update frontend `CommunityLevels.tsx` and `App.tsx`/`LevelEditor.tsx` if any API shape changes.

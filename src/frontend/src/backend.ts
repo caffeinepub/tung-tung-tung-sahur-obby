@@ -105,9 +105,11 @@ export interface CustomLevel {
     bgHue: bigint;
 }
 export interface backendInterface {
+    deleteLevel(id: bigint): Promise<void>;
     deleteMyLevel(): Promise<void>;
     getAllUsernames(): Promise<Array<[Principal, string]>>;
     getLeaderboard(): Promise<Array<[Principal, UserStats]>>;
+    getLevelById(id: bigint): Promise<CustomLevel | null>;
     getMyLevel(): Promise<CustomLevel | null>;
     getMyStats(): Promise<UserStats>;
     getMyUsername(): Promise<string | null>;
@@ -121,6 +123,20 @@ export interface backendInterface {
 import type { CustomLevel as _CustomLevel } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
     constructor(private actor: ActorSubclass<_SERVICE>, private _uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, private _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, private processError?: (error: unknown) => never){}
+    async deleteLevel(arg0: bigint): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.deleteLevel(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.deleteLevel(arg0);
+            return result;
+        }
+    }
     async deleteMyLevel(): Promise<void> {
         if (this.processError) {
             try {
@@ -161,6 +177,20 @@ export class Backend implements backendInterface {
         } else {
             const result = await this.actor.getLeaderboard();
             return result;
+        }
+    }
+    async getLevelById(arg0: bigint): Promise<CustomLevel | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getLevelById(arg0);
+                return from_candid_opt_n1(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getLevelById(arg0);
+            return from_candid_opt_n1(this._uploadFile, this._downloadFile, result);
         }
     }
     async getMyLevel(): Promise<CustomLevel | null> {

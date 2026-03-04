@@ -23,6 +23,7 @@ interface CommunityLevelsProps {
     worldWidth: number;
     bgHue: number;
   }) => void;
+  usernameMap?: Map<string, string>;
 }
 
 // ===================================================
@@ -32,6 +33,7 @@ interface CommunityLevelsProps {
 export default function CommunityLevels({
   onBack,
   onPlayLevel,
+  usernameMap,
 }: CommunityLevelsProps) {
   const { actor } = useActor();
   const [levels, setLevels] = useState<CommunityLevelItem[]>([]);
@@ -64,9 +66,18 @@ export default function CommunityLevels({
       });
   }, [actor]);
 
+  const OWNER_USERNAME = "tung_master";
+
   const formatAuthor = (principal: string) => {
+    const username = usernameMap?.get(principal);
+    if (username) return username;
     if (principal.length <= 12) return principal;
     return `${principal.slice(0, 8)}…${principal.slice(-4)}`;
+  };
+
+  const isOwner = (principal: string) => {
+    const username = usernameMap?.get(principal);
+    return username === OWNER_USERNAME;
   };
 
   return (
@@ -293,12 +304,20 @@ export default function CommunityLevels({
                   <div
                     style={{
                       fontSize: 10,
-                      color: "rgba(200,180,255,0.45)",
+                      color: isOwner(level.author)
+                        ? "#22c55e"
+                        : "rgba(200,180,255,0.45)",
                       fontFamily: "'Sora', monospace",
                       marginTop: 3,
+                      textShadow: isOwner(level.author)
+                        ? "0 0 6px #22c55e"
+                        : "none",
                     }}
                   >
-                    by {formatAuthor(level.author)}
+                    by{" "}
+                    {isOwner(level.author)
+                      ? `👑 ${formatAuthor(level.author)}`
+                      : formatAuthor(level.author)}
                   </div>
                   <div
                     style={{

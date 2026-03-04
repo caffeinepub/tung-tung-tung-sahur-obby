@@ -25,6 +25,7 @@ export const CustomLevel = IDL.Record({
 });
 
 export const idlService = IDL.Service({
+  'deleteLevel' : IDL.Func([IDL.Nat], [], []),
   'deleteMyLevel' : IDL.Func([], [], []),
   'getAllUsernames' : IDL.Func(
       [],
@@ -36,6 +37,7 @@ export const idlService = IDL.Service({
       [IDL.Vec(IDL.Tuple(IDL.Principal, UserStats))],
       ['query'],
     ),
+  'getLevelById' : IDL.Func([IDL.Nat], [IDL.Opt(CustomLevel)], ['query']),
   'getMyLevel' : IDL.Func([], [IDL.Opt(CustomLevel)], ['query']),
   'getMyStats' : IDL.Func([], [UserStats], ['query']),
   'getMyUsername' : IDL.Func([], [IDL.Opt(IDL.Text)], ['query']),
@@ -75,6 +77,7 @@ export const idlFactory = ({ IDL }) => {
   });
   
   return IDL.Service({
+    'deleteLevel' : IDL.Func([IDL.Nat], [], []),
     'deleteMyLevel' : IDL.Func([], [], []),
     'getAllUsernames' : IDL.Func(
         [],
@@ -86,6 +89,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(IDL.Tuple(IDL.Principal, UserStats))],
         ['query'],
       ),
+    'getLevelById' : IDL.Func([IDL.Nat], [IDL.Opt(CustomLevel)], ['query']),
     'getMyLevel' : IDL.Func([], [IDL.Opt(CustomLevel)], ['query']),
     'getMyStats' : IDL.Func([], [UserStats], ['query']),
     'getMyUsername' : IDL.Func([], [IDL.Opt(IDL.Text)], ['query']),

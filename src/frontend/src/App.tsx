@@ -785,7 +785,7 @@ export default function App() {
           if (a.bestStage < b.bestStage) return 1;
           return Number(a.totalDeaths) - Number(b.totalDeaths);
         })
-        .slice(0, 10);
+        .slice(0, 100);
 
       const speedEntries: SpeedLeaderboardEntry[] = speedLb
         .filter(([, userStats]) => userStats.bestCompletionTimeMs > 0n)
@@ -798,7 +798,7 @@ export default function App() {
           (a, b) =>
             Number(a.bestCompletionTimeMs) - Number(b.bestCompletionTimeMs),
         )
-        .slice(0, 10);
+        .slice(0, 100);
 
       setLeaderboard(entries);
       setSpeedLeaderboard(speedEntries);
@@ -1111,6 +1111,7 @@ export default function App() {
         <CommunityLevels
           onBack={() => setScreen("start")}
           onPlayLevel={handlePlayCommunityLevel}
+          usernameMap={usernameMap}
         />
       )}
 

@@ -232,6 +232,12 @@ function makeFinish(x: number, y: number): Platform {
   };
 }
 
+function makeFinishBase(x: number, y: number): Platform {
+  // A solid platform centered under the finish flag pole, for the player to stand on
+  const pw = 140;
+  return makePlatform(x - pw / 2 + 15, y + 80, pw, 20, "static", "#fbbf24");
+}
+
 function makeJumpPad(x: number, y: number): Platform {
   return {
     x,
@@ -295,6 +301,7 @@ function buildStages(): StageConfig[] {
         makePlatform(3560, 290, 160, 20),
         makePlatform(3780, 330, 120, 20),
         makeFinish(4050, 220),
+        makeFinishBase(4050, 220),
       ],
     },
 
@@ -329,6 +336,7 @@ function buildStages(): StageConfig[] {
         makePlatform(3640, 350, 120, 20),
         makeMoving(3840, 290, 100, 20, 100, 0, 150, 0),
         makeFinish(4100, 220),
+        makeFinishBase(4100, 220),
       ],
     },
 
@@ -413,6 +421,7 @@ function buildStages(): StageConfig[] {
         makeCheckpointBase(4200, 300),
         makePlatform(4280, 300, 130, 20),
         makeFinish(4450, 230),
+        makeFinishBase(4450, 230),
       ],
     },
 
@@ -451,6 +460,7 @@ function buildStages(): StageConfig[] {
         makeRhythm(3920, 280, 100, 18, 0.5),
         makePlatform(4120, 310, 110, 20),
         makeFinish(4300, 240),
+        makeFinishBase(4300, 240),
       ],
     },
 
@@ -496,6 +506,7 @@ function buildStages(): StageConfig[] {
         makePlatform(4280, 240, 55, 12, "static", "#22d3ee"),
         makePlatform(4460, 260, 60, 12, "static", "#22d3ee"),
         makeFinish(4640, 180),
+        makeFinishBase(4640, 180),
       ],
     },
 
@@ -538,6 +549,7 @@ function buildStages(): StageConfig[] {
         makePlatform(4180, -620, 110, 20),
         makePlatform(4390, -600, 130, 20),
         makeFinish(4700, -700),
+        makeFinishBase(4700, -700),
       ],
     },
 
@@ -577,6 +589,7 @@ function buildStages(): StageConfig[] {
         makePlatform(4030, 280, 120, 20),
         makePlatform(4240, 300, 110, 20),
         makeFinish(4380, 210),
+        makeFinishBase(4380, 210),
       ],
     },
 
@@ -616,6 +629,7 @@ function buildStages(): StageConfig[] {
         makePlatform(3900, 280, 120, 20),
         makePlatform(4100, 250, 110, 20),
         makeFinish(4270, 180),
+        makeFinishBase(4270, 180),
       ],
     },
 
@@ -744,6 +758,7 @@ function buildStages(): StageConfig[] {
         },
         makePlatform(4320, 230, 110, 20),
         makeFinish(4480, 160),
+        makeFinishBase(4480, 160),
       ],
     },
 
@@ -785,6 +800,7 @@ function buildStages(): StageConfig[] {
         makePlatform(4300, 400, 80, 300), // tall pillar left side
         makePlatform(4380, 180, 180, 20), // top platform where finish is
         makeFinish(4460, 100),
+        makeFinishBase(4460, 100),
       ],
     },
   ];

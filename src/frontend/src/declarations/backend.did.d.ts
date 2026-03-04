@@ -26,9 +26,11 @@ export interface UserStats {
   'bestStage' : bigint,
 }
 export interface _SERVICE {
+  'deleteLevel' : ActorMethod<[bigint], undefined>,
   'deleteMyLevel' : ActorMethod<[], undefined>,
   'getAllUsernames' : ActorMethod<[], Array<[Principal, string]>>,
   'getLeaderboard' : ActorMethod<[], Array<[Principal, UserStats]>>,
+  'getLevelById' : ActorMethod<[bigint], [] | [CustomLevel]>,
   'getMyLevel' : ActorMethod<[], [] | [CustomLevel]>,
   'getMyStats' : ActorMethod<[], UserStats>,
   'getMyUsername' : ActorMethod<[], [] | [string]>,

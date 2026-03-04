@@ -9,9 +9,9 @@ import Text "mo:core/Text";
 import Nat "mo:core/Nat";
 import Int "mo:core/Int";
 import Char "mo:core/Char";
+import Migration "migration";
 
-
-
+(with migration = Migration.run)
 actor {
   type UserStats = {
     bestStage : Nat;
@@ -51,8 +51,8 @@ actor {
     };
   };
 
-  var nextLevelId = 1;
-  let customLevels = Map.empty<Principal, CustomLevel>();
+  var nextLevelId = 0;
+  let customLevelsById = Map.empty<Nat, CustomLevel>();
 
   // Username system
   let usernames = Map.empty<Text, Principal>();
@@ -171,15 +171,15 @@ actor {
     };
   };
 
-  // Get top 10 players for leaderboard
+  // Get top 100 players for leaderboard
   public query func getLeaderboard() : async [(Principal, UserStats)] {
     let statsArray = stats.entries().toArray();
     let sortedStats = statsArray.sort(UserStats.compareByBestStageThenDeaths);
-    let entriesToTake = if (sortedStats.size() < 10) { sortedStats.size() } else { 10 };
+    let entriesToTake = if (sortedStats.size() < 100) { sortedStats.size() } else { 100 };
     sortedStats.sliceToArray(0, entriesToTake);
   };
 
-  // Get top 10 players for speed runs (lowest non-zero completion time)
+  // Get top 100 players for speed runs (lowest non-zero completion time)
   public query func getSpeedLeaderboard() : async [(Principal, UserStats)] {
     let filteredStats = stats.entries().toArray().filter(
       func(entry) {
@@ -187,11 +187,11 @@ actor {
       }
     );
     let sortedStats = filteredStats.sort(UserStats.compareByCompletionTime);
-    let entriesToTake = if (sortedStats.size() < 10) { sortedStats.size() } else { 10 };
+    let entriesToTake = if (sortedStats.size() < 100) { sortedStats.size() } else { 100 };
     sortedStats.sliceToArray(0, entriesToTake);
   };
 
-  // Save or update custom level for a user
+  // Save new custom level
   public shared ({ caller }) func saveCustomLevel(name : Text, platformsJson : Text, worldWidth : Nat, bgHue : Nat) : async () {
     let trimmedName = name.trimStart(#char(' ')).trimEnd(#char(' '));
     let nameLen = trimmedName.size();
@@ -219,28 +219,71 @@ actor {
       createdAt = Time.now();
     };
 
-    customLevels.add(caller, newLevel);
+    customLevelsById.add(nextLevelId, newLevel);
     nextLevelId += 1;
   };
 
-  // Get current user's custom level
+  // Get the most recently created level by the caller
   public query ({ caller }) func getMyLevel() : async ?CustomLevel {
-    customLevels.get(caller);
+    var mostRecentLevel : ?CustomLevel = null;
+    var latestTime : Int = 0;
+
+    for ((_, level) in customLevelsById.entries()) {
+      if (level.author == caller and level.createdAt > latestTime) {
+        mostRecentLevel := ?level;
+        latestTime := level.createdAt;
+      };
+    };
+
+    mostRecentLevel;
   };
 
   // Get up to 100 newest public custom levels
   public query func getPublicLevels() : async [CustomLevel] {
-    let levelsArray = customLevels.values().toArray();
+    let levelsArray = customLevelsById.values().toArray();
     let sortedLevels = levelsArray.sort(CustomLevel.compareByCreatedAt);
     let levelsToTake = if (sortedLevels.size() < 100) { sortedLevels.size() } else { 100 };
     sortedLevels.sliceToArray(0, levelsToTake);
   };
 
-  // Delete current user's custom level
+  // Delete the most recently created level by the caller
   public shared ({ caller }) func deleteMyLevel() : async () {
-    if (not customLevels.containsKey(caller)) {
-      Runtime.trap("No custom level found for current user");
+    var mostRecentLevelId : ?Nat = null;
+    var latestTime : Int = 0;
+
+    for ((id, level) in customLevelsById.entries()) {
+      if (level.author == caller and level.createdAt > latestTime) {
+        mostRecentLevelId := ?id;
+        latestTime := level.createdAt;
+      };
     };
-    customLevels.remove(caller);
+
+    switch (mostRecentLevelId) {
+      case (null) {
+        Runtime.trap("No custom level found for current user");
+      };
+      case (?id) {
+        customLevelsById.remove(id);
+      };
+    };
+  };
+
+  // Query (read-only) custom level by ID
+  public query ({ caller }) func getLevelById(id : Nat) : async ?CustomLevel {
+    customLevelsById.get(id);
+  };
+
+  // Delete level by ID if caller is author
+  public shared ({ caller }) func deleteLevel(id : Nat) : async () {
+    switch (customLevelsById.get(id)) {
+      case (null) { Runtime.trap("Level with id " # id.toText() # " not found") };
+      case (?level) {
+        if (level.author != caller) {
+          Runtime.trap("Only the author can delete this level");
+        };
+
+        customLevelsById.remove(id);
+      };
+    };
   };
 };

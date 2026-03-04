@@ -23,9 +23,11 @@ export interface CustomLevel {
     bgHue: bigint;
 }
 export interface backendInterface {
+    deleteLevel(id: bigint): Promise<void>;
     deleteMyLevel(): Promise<void>;
     getAllUsernames(): Promise<Array<[Principal, string]>>;
     getLeaderboard(): Promise<Array<[Principal, UserStats]>>;
+    getLevelById(id: bigint): Promise<CustomLevel | null>;
     getMyLevel(): Promise<CustomLevel | null>;
     getMyStats(): Promise<UserStats>;
     getMyUsername(): Promise<string | null>;
