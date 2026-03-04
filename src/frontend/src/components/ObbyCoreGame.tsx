@@ -1273,6 +1273,7 @@ interface ObbyCoreGameProps {
   onCheckpoint: () => void;
   gameActive: boolean;
   drumPulseSignal: (active: boolean) => void;
+  customStage?: StageConfig;
 }
 
 const STAGES = buildStages();
@@ -1285,6 +1286,7 @@ export default function ObbyCoreGame({
   onCheckpoint,
   gameActive,
   drumPulseSignal,
+  customStage,
 }: ObbyCoreGameProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -1364,8 +1366,16 @@ export default function ObbyCoreGame({
     null,
   );
 
+  const customStageRef = useRef<StageConfig | undefined>(customStage);
+  useEffect(() => {
+    customStageRef.current = customStage;
+  }, [customStage]);
+
   const loadStage = useCallback((stageId: number) => {
-    const cfg = STAGES.find((s) => s.id === stageId);
+    const cfg =
+      stageId === 99 && customStageRef.current
+        ? customStageRef.current
+        : STAGES.find((s) => s.id === stageId);
     if (!cfg) return;
 
     // Deep copy platforms
@@ -1480,6 +1490,11 @@ export default function ObbyCoreGame({
 
   const advanceStage = useCallback(() => {
     const gs = gsRef.current;
+    if (gs.stage === 99) {
+      gs.phase = "win";
+      onWin(gs.deaths);
+      return;
+    }
     if (gs.stage >= 10) {
       gs.phase = "win";
       onWin(gs.deaths);
@@ -1877,7 +1892,10 @@ export default function ObbyCoreGame({
     const cam = cameraRef.current;
     const time = timeRef.current;
     const stageId = gs.stage;
-    const cfg = STAGES.find((s) => s.id === stageId) ?? STAGES[0];
+    const cfg =
+      stageId === 99 && customStageRef.current
+        ? customStageRef.current
+        : (STAGES.find((s) => s.id === stageId) ?? STAGES[0]);
 
     ctx.clearRect(0, 0, W, H);
 
@@ -2227,10 +2245,11 @@ export default function ObbyCoreGame({
   useEffect(() => {
     if (gameActive) {
       gsRef.current.phase = "playing";
-      gsRef.current.stage = 1;
+      const startStage = customStageRef.current ? 99 : 1;
+      gsRef.current.stage = startStage;
       gsRef.current.lives = 3;
       gsRef.current.deaths = 0;
-      loadStage(1);
+      loadStage(startStage);
     }
   }, [gameActive, loadStage]);
 
@@ -2244,4 +2263,4 @@ export default function ObbyCoreGame({
   );
 }
 
-export type { GameState };
+export type { GameState, Platform, StageConfig };

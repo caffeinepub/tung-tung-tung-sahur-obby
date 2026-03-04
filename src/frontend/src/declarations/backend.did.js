@@ -9,38 +9,80 @@
 import { IDL } from '@icp-sdk/core/candid';
 
 export const UserStats = IDL.Record({
+  'bestCompletionTimeMs' : IDL.Nat,
   'totalDeaths' : IDL.Nat,
   'totalWins' : IDL.Nat,
   'bestStage' : IDL.Nat,
 });
+export const CustomLevel = IDL.Record({
+  'id' : IDL.Nat,
+  'worldWidth' : IDL.Nat,
+  'name' : IDL.Text,
+  'createdAt' : IDL.Int,
+  'author' : IDL.Principal,
+  'platformsJson' : IDL.Text,
+  'bgHue' : IDL.Nat,
+});
 
 export const idlService = IDL.Service({
+  'deleteMyLevel' : IDL.Func([], [], []),
   'getLeaderboard' : IDL.Func(
       [],
       [IDL.Vec(IDL.Tuple(IDL.Principal, UserStats))],
       ['query'],
     ),
+  'getMyLevel' : IDL.Func([], [IDL.Opt(CustomLevel)], ['query']),
   'getMyStats' : IDL.Func([], [UserStats], ['query']),
-  'saveGameResult' : IDL.Func([IDL.Nat, IDL.Nat], [], []),
+  'getPublicLevels' : IDL.Func([], [IDL.Vec(CustomLevel)], ['query']),
+  'getSpeedLeaderboard' : IDL.Func(
+      [],
+      [IDL.Vec(IDL.Tuple(IDL.Principal, UserStats))],
+      ['query'],
+    ),
+  'saveCustomLevel' : IDL.Func([IDL.Text, IDL.Text, IDL.Nat, IDL.Nat], [], []),
+  'saveGameResult' : IDL.Func([IDL.Nat, IDL.Nat, IDL.Nat], [], []),
 });
 
 export const idlInitArgs = [];
 
 export const idlFactory = ({ IDL }) => {
   const UserStats = IDL.Record({
+    'bestCompletionTimeMs' : IDL.Nat,
     'totalDeaths' : IDL.Nat,
     'totalWins' : IDL.Nat,
     'bestStage' : IDL.Nat,
   });
+  const CustomLevel = IDL.Record({
+    'id' : IDL.Nat,
+    'worldWidth' : IDL.Nat,
+    'name' : IDL.Text,
+    'createdAt' : IDL.Int,
+    'author' : IDL.Principal,
+    'platformsJson' : IDL.Text,
+    'bgHue' : IDL.Nat,
+  });
   
   return IDL.Service({
+    'deleteMyLevel' : IDL.Func([], [], []),
     'getLeaderboard' : IDL.Func(
         [],
         [IDL.Vec(IDL.Tuple(IDL.Principal, UserStats))],
         ['query'],
       ),
+    'getMyLevel' : IDL.Func([], [IDL.Opt(CustomLevel)], ['query']),
     'getMyStats' : IDL.Func([], [UserStats], ['query']),
-    'saveGameResult' : IDL.Func([IDL.Nat, IDL.Nat], [], []),
+    'getPublicLevels' : IDL.Func([], [IDL.Vec(CustomLevel)], ['query']),
+    'getSpeedLeaderboard' : IDL.Func(
+        [],
+        [IDL.Vec(IDL.Tuple(IDL.Principal, UserStats))],
+        ['query'],
+      ),
+    'saveCustomLevel' : IDL.Func(
+        [IDL.Text, IDL.Text, IDL.Nat, IDL.Nat],
+        [],
+        [],
+      ),
+    'saveGameResult' : IDL.Func([IDL.Nat, IDL.Nat, IDL.Nat], [], []),
   });
 };
 

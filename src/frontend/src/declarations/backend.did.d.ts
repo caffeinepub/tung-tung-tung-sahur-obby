@@ -10,15 +10,30 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 import type { Principal } from '@icp-sdk/core/principal';
 
+export interface CustomLevel {
+  'id' : bigint,
+  'worldWidth' : bigint,
+  'name' : string,
+  'createdAt' : bigint,
+  'author' : Principal,
+  'platformsJson' : string,
+  'bgHue' : bigint,
+}
 export interface UserStats {
+  'bestCompletionTimeMs' : bigint,
   'totalDeaths' : bigint,
   'totalWins' : bigint,
   'bestStage' : bigint,
 }
 export interface _SERVICE {
+  'deleteMyLevel' : ActorMethod<[], undefined>,
   'getLeaderboard' : ActorMethod<[], Array<[Principal, UserStats]>>,
+  'getMyLevel' : ActorMethod<[], [] | [CustomLevel]>,
   'getMyStats' : ActorMethod<[], UserStats>,
-  'saveGameResult' : ActorMethod<[bigint, bigint], undefined>,
+  'getPublicLevels' : ActorMethod<[], Array<CustomLevel>>,
+  'getSpeedLeaderboard' : ActorMethod<[], Array<[Principal, UserStats]>>,
+  'saveCustomLevel' : ActorMethod<[string, string, bigint, bigint], undefined>,
+  'saveGameResult' : ActorMethod<[bigint, bigint, bigint], undefined>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

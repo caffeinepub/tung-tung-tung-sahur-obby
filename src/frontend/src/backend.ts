@@ -90,17 +90,47 @@ export class ExternalBlob {
     }
 }
 export interface UserStats {
+    bestCompletionTimeMs: bigint;
     totalDeaths: bigint;
     totalWins: bigint;
     bestStage: bigint;
 }
-export interface backendInterface {
-    getLeaderboard(): Promise<Array<[Principal, UserStats]>>;
-    getMyStats(): Promise<UserStats>;
-    saveGameResult(stageReached: bigint, deathsThisRun: bigint): Promise<void>;
+export interface CustomLevel {
+    id: bigint;
+    worldWidth: bigint;
+    name: string;
+    createdAt: bigint;
+    author: Principal;
+    platformsJson: string;
+    bgHue: bigint;
 }
+export interface backendInterface {
+    deleteMyLevel(): Promise<void>;
+    getLeaderboard(): Promise<Array<[Principal, UserStats]>>;
+    getMyLevel(): Promise<CustomLevel | null>;
+    getMyStats(): Promise<UserStats>;
+    getPublicLevels(): Promise<Array<CustomLevel>>;
+    getSpeedLeaderboard(): Promise<Array<[Principal, UserStats]>>;
+    saveCustomLevel(name: string, platformsJson: string, worldWidth: bigint, bgHue: bigint): Promise<void>;
+    saveGameResult(stageReached: bigint, deathsThisRun: bigint, completionTimeMs: bigint): Promise<void>;
+}
+import type { CustomLevel as _CustomLevel } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
     constructor(private actor: ActorSubclass<_SERVICE>, private _uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, private _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, private processError?: (error: unknown) => never){}
+    async deleteMyLevel(): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.deleteMyLevel();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.deleteMyLevel();
+            return result;
+        }
+    }
     async getLeaderboard(): Promise<Array<[Principal, UserStats]>> {
         if (this.processError) {
             try {
@@ -113,6 +143,20 @@ export class Backend implements backendInterface {
         } else {
             const result = await this.actor.getLeaderboard();
             return result;
+        }
+    }
+    async getMyLevel(): Promise<CustomLevel | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getMyLevel();
+                return from_candid_opt_n1(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getMyLevel();
+            return from_candid_opt_n1(this._uploadFile, this._downloadFile, result);
         }
     }
     async getMyStats(): Promise<UserStats> {
@@ -129,20 +173,65 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async saveGameResult(arg0: bigint, arg1: bigint): Promise<void> {
+    async getPublicLevels(): Promise<Array<CustomLevel>> {
         if (this.processError) {
             try {
-                const result = await this.actor.saveGameResult(arg0, arg1);
+                const result = await this.actor.getPublicLevels();
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.saveGameResult(arg0, arg1);
+            const result = await this.actor.getPublicLevels();
             return result;
         }
     }
+    async getSpeedLeaderboard(): Promise<Array<[Principal, UserStats]>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getSpeedLeaderboard();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getSpeedLeaderboard();
+            return result;
+        }
+    }
+    async saveCustomLevel(arg0: string, arg1: string, arg2: bigint, arg3: bigint): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.saveCustomLevel(arg0, arg1, arg2, arg3);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.saveCustomLevel(arg0, arg1, arg2, arg3);
+            return result;
+        }
+    }
+    async saveGameResult(arg0: bigint, arg1: bigint, arg2: bigint): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.saveGameResult(arg0, arg1, arg2);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.saveGameResult(arg0, arg1, arg2);
+            return result;
+        }
+    }
+}
+function from_candid_opt_n1(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_CustomLevel]): CustomLevel | null {
+    return value.length === 0 ? null : value[0];
 }
 export interface CreateActorOptions {
     agent?: Agent;

@@ -1,18 +1,52 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import CommunityLevels from "./components/CommunityLevels";
+import LeaderboardScreen from "./components/Leaderboard";
+import type { SpeedLeaderboardEntry } from "./components/Leaderboard";
+import { formatTime } from "./components/Leaderboard";
+import LevelEditor from "./components/LevelEditor";
 import ObbyCoreGame from "./components/ObbyCoreGame";
+import type { Platform, StageConfig } from "./components/ObbyCoreGame";
 import { useActor } from "./hooks/useActor";
 
 // ===================================================
 // TYPES
 // ===================================================
 
-type GameScreen = "start" | "playing" | "gameover" | "win";
+type GameScreen =
+  | "start"
+  | "playing"
+  | "gameover"
+  | "win"
+  | "editor"
+  | "community"
+  | "playing_custom"
+  | "leaderboard";
 
 interface LeaderboardEntry {
   principal: string;
   totalDeaths: bigint;
   totalWins: bigint;
   bestStage: bigint;
+}
+
+// ===================================================
+// HELPER FUNCTION
+// ===================================================
+
+function buildCustomStageFromLevel(level: {
+  name: string;
+  platformsJson: string;
+  worldWidth: number;
+  bgHue: number;
+}): StageConfig {
+  return {
+    id: 99,
+    name: level.name,
+    bgHue: level.bgHue,
+    worldWidth: level.worldWidth,
+    spinners: [],
+    platforms: JSON.parse(level.platformsJson) as Platform[],
+  };
 }
 
 // ===================================================
@@ -99,6 +133,9 @@ function DrumPulse({ active }: { active: boolean }) {
 
 interface StartScreenProps {
   onStart: () => void;
+  onEditor: () => void;
+  onCommunity: () => void;
+  onLeaderboard: () => void;
   leaderboard: LeaderboardEntry[];
   personalBest: bigint | null;
   isLoading: boolean;
@@ -106,7 +143,10 @@ interface StartScreenProps {
 
 function StartScreen({
   onStart,
-  leaderboard,
+  onEditor,
+  onCommunity,
+  onLeaderboard,
+  leaderboard: _leaderboard,
   personalBest,
   isLoading,
 }: StartScreenProps) {
@@ -221,7 +261,35 @@ function StartScreen({
           {isLoading ? "Loading..." : "▶ START GAME"}
         </button>
 
-        <LeaderboardSection entries={leaderboard} />
+        <div style={{ display: "flex", gap: 12, width: "100%" }}>
+          <button
+            type="button"
+            className="game-button game-button-secondary"
+            onClick={onEditor}
+            data-ocid="start.editor_button"
+            style={{ flex: 1, fontSize: 14, padding: "12px 16px" }}
+          >
+            ⚙ LEVEL EDITOR
+          </button>
+          <button
+            type="button"
+            className="game-button game-button-secondary"
+            onClick={onCommunity}
+            data-ocid="start.community_button"
+            style={{ flex: 1, fontSize: 14, padding: "12px 16px" }}
+          >
+            🌐 COMMUNITY
+          </button>
+        </div>
+
+        <button
+          type="button"
+          className="lb-nav-btn"
+          onClick={onLeaderboard}
+          data-ocid="start.leaderboard_button"
+        >
+          🏆 LEADERBOARD
+        </button>
       </div>
     </div>
   );
@@ -235,20 +303,40 @@ interface WinScreenProps {
   deaths: number;
   onReplay: () => void;
   leaderboard: LeaderboardEntry[];
+  isCustomLevel?: boolean;
+  completionTimeMs?: number;
 }
 
-function WinScreen({ deaths, onReplay, leaderboard }: WinScreenProps) {
+function WinScreen({
+  deaths,
+  onReplay,
+  leaderboard,
+  isCustomLevel,
+  completionTimeMs,
+}: WinScreenProps) {
   return (
     <div className="screen-overlay">
       <div className="screen-overlay-bg" />
       <div className="screen-content">
         <div className="win-title">
-          YOU ESCAPED
-          <br />
-          TUNG TUNG TUNG SAHUR!
+          {isCustomLevel ? (
+            <>
+              LEVEL COMPLETE!
+              <br />
+              YOU MADE IT!
+            </>
+          ) : (
+            <>
+              YOU ESCAPED
+              <br />
+              TUNG TUNG TUNG SAHUR!
+            </>
+          )}
         </div>
         <p className="game-subtitle">
-          The creature's drum beats fade into the distance...
+          {isCustomLevel
+            ? "You completed the custom level!"
+            : "The creature's drum beats fade into the distance..."}
         </p>
 
         <div className="stats-row">
@@ -258,11 +346,24 @@ function WinScreen({ deaths, onReplay, leaderboard }: WinScreenProps) {
           </div>
           <div className="stat-pill">
             <span className="stat-label">Stage</span>
-            <span className="stat-value">10/10 ✓</span>
+            <span className="stat-value">
+              {isCustomLevel ? "Custom ✓" : "10/10 ✓"}
+            </span>
           </div>
+          {completionTimeMs !== undefined && completionTimeMs > 0 && (
+            <div className="stat-pill">
+              <span className="stat-label">Time</span>
+              <span
+                className="stat-value"
+                style={{ color: "var(--neon-cyan)" }}
+              >
+                {formatTime(completionTimeMs)}
+              </span>
+            </div>
+          )}
         </div>
 
-        <LeaderboardSection entries={leaderboard} />
+        {!isCustomLevel && <LeaderboardSection entries={leaderboard} />}
 
         <button
           type="button"
@@ -270,7 +371,7 @@ function WinScreen({ deaths, onReplay, leaderboard }: WinScreenProps) {
           onClick={onReplay}
           data-ocid="win.primary_button"
         >
-          ↺ PLAY AGAIN
+          {isCustomLevel ? "← Back to Menu" : "↺ PLAY AGAIN"}
         </button>
       </div>
     </div>
@@ -285,9 +386,15 @@ interface GameOverScreenProps {
   deaths: number;
   stage: number;
   onRetry: () => void;
+  isCustomLevel?: boolean;
 }
 
-function GameOverScreen({ deaths, stage, onRetry }: GameOverScreenProps) {
+function GameOverScreen({
+  deaths,
+  stage,
+  onRetry,
+  isCustomLevel,
+}: GameOverScreenProps) {
   return (
     <div className="screen-overlay">
       <div className="screen-overlay-bg" />
@@ -304,7 +411,9 @@ function GameOverScreen({ deaths, stage, onRetry }: GameOverScreenProps) {
           </div>
           <div className="stat-pill">
             <span className="stat-label">Reached Stage</span>
-            <span className="stat-value">{stage}/10</span>
+            <span className="stat-value">
+              {isCustomLevel ? "Custom" : `${stage}/10`}
+            </span>
           </div>
         </div>
 
@@ -314,7 +423,7 @@ function GameOverScreen({ deaths, stage, onRetry }: GameOverScreenProps) {
           onClick={onRetry}
           data-ocid="gameover.primary_button"
         >
-          ↺ TRY AGAIN
+          {isCustomLevel ? "← Back to Menu" : "↺ TRY AGAIN"}
         </button>
       </div>
     </div>
@@ -330,14 +439,32 @@ interface HUDProps {
   lives: number;
   deaths: number;
   drumActive: boolean;
+  isCustomLevel?: boolean;
+  onMenu: () => void;
 }
 
-function HUD({ stage, lives, deaths, drumActive }: HUDProps) {
+function HUD({
+  stage,
+  lives,
+  deaths,
+  drumActive,
+  isCustomLevel,
+  onMenu,
+}: HUDProps) {
   return (
     <div className="game-hud">
       <div className="hud-top">
+        <button
+          type="button"
+          className="hud-menu-btn"
+          onClick={onMenu}
+          data-ocid="hud.menu_button"
+          title="Back to Menu"
+        >
+          ← Menu
+        </button>
         <div className="hud-panel hud-stage" data-ocid="hud.stage_panel">
-          Stage {stage} / 10
+          {isCustomLevel ? "Custom Level" : `Stage ${stage} / 10`}
         </div>
         <div className="hud-panel hud-lives" data-ocid="hud.lives_panel">
           <HeartIcon filled={lives >= 1} />
@@ -402,19 +529,39 @@ export default function App() {
   const [deaths, setDeaths] = useState(0);
   const [drumActive, setDrumActive] = useState(false);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [speedLeaderboard, setSpeedLeaderboard] = useState<
+    SpeedLeaderboardEntry[]
+  >([]);
   const [personalBest, setPersonalBest] = useState<bigint | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLeaderboardLoading, setIsLeaderboardLoading] = useState(false);
   const [finalDeaths, setFinalDeaths] = useState(0);
   const [finalStage, setFinalStage] = useState(1);
+  const [finalCompletionTimeMs, setFinalCompletionTimeMs] = useState(0);
+
+  // Timer for speed runs
+  const startTimeRef = useRef<number | null>(null);
+
+  // Custom level state
+  const [customStageToPlay, setCustomStageToPlay] =
+    useState<StageConfig | null>(null);
+  const [userExistingLevel, setUserExistingLevel] = useState<{
+    name: string;
+    platformsJson: string;
+    worldWidth: number;
+    bgHue: number;
+  } | null>(null);
 
   const gameActiveRef = useRef(false);
 
-  // Load leaderboard
+  // Load leaderboard + user's saved level
   const loadLeaderboard = useCallback(async () => {
     if (!actor) return;
+    setIsLeaderboardLoading(true);
     try {
-      const [lb, stats] = await Promise.all([
+      const [lb, speedLb, stats] = await Promise.all([
         actor.getLeaderboard(),
+        actor.getSpeedLeaderboard(),
         actor.getMyStats(),
       ]);
 
@@ -430,23 +577,58 @@ export default function App() {
           if (a.bestStage < b.bestStage) return 1;
           return Number(a.totalDeaths) - Number(b.totalDeaths);
         })
-        .slice(0, 3);
+        .slice(0, 10);
+
+      const speedEntries: SpeedLeaderboardEntry[] = speedLb
+        .filter(([, userStats]) => userStats.bestCompletionTimeMs > 0n)
+        .map(([principal, userStats]) => ({
+          principal: principal.toString(),
+          bestCompletionTimeMs: userStats.bestCompletionTimeMs,
+          totalWins: userStats.totalWins,
+        }))
+        .sort(
+          (a, b) =>
+            Number(a.bestCompletionTimeMs) - Number(b.bestCompletionTimeMs),
+        )
+        .slice(0, 10);
 
       setLeaderboard(entries);
+      setSpeedLeaderboard(speedEntries);
 
       if (stats.bestStage > 0n) {
         setPersonalBest(stats.bestStage);
       }
     } catch {
       // Silently fail if backend unavailable
+    } finally {
+      setIsLeaderboardLoading(false);
+    }
+  }, [actor]);
+
+  // Load user's existing custom level
+  const loadUserLevel = useCallback(async () => {
+    if (!actor) return;
+    try {
+      const myLevel = await actor.getMyLevel();
+      if (myLevel) {
+        setUserExistingLevel({
+          name: myLevel.name,
+          platformsJson: myLevel.platformsJson,
+          worldWidth: Number(myLevel.worldWidth),
+          bgHue: Number(myLevel.bgHue),
+        });
+      }
+    } catch {
+      // Silently fail
     }
   }, [actor]);
 
   useEffect(() => {
     if (actor) {
       loadLeaderboard();
+      loadUserLevel();
     }
-  }, [actor, loadLeaderboard]);
+  }, [actor, loadLeaderboard, loadUserLevel]);
 
   const handleStart = useCallback(() => {
     setScreen("playing");
@@ -455,6 +637,7 @@ export default function App() {
     setDeaths(0);
     setDrumActive(false);
     gameActiveRef.current = true;
+    startTimeRef.current = Date.now();
   }, []);
 
   const handleDeath = useCallback((totalDeaths: number) => {
@@ -464,19 +647,23 @@ export default function App() {
 
   const handleStageChange = useCallback((newStage: number) => {
     setStage(newStage);
-    setLives(3); // Reset lives on stage advance? Or keep? Keeping for difficulty
   }, []);
 
   const handleGameOver = useCallback(
     async (stageReached: number, totalDeaths: number) => {
       setFinalDeaths(totalDeaths);
       setFinalStage(stageReached);
+      setFinalCompletionTimeMs(0);
       setScreen("gameover");
       gameActiveRef.current = false;
 
       if (actor) {
         try {
-          await actor.saveGameResult(BigInt(stageReached), BigInt(totalDeaths));
+          await actor.saveGameResult(
+            BigInt(stageReached),
+            BigInt(totalDeaths),
+            0n,
+          );
           await loadLeaderboard();
         } catch {
           // Silently fail
@@ -488,14 +675,21 @@ export default function App() {
 
   const handleWin = useCallback(
     async (totalDeaths: number) => {
+      const elapsedMs =
+        startTimeRef.current !== null ? Date.now() - startTimeRef.current : 0;
       setFinalDeaths(totalDeaths);
       setFinalStage(10);
+      setFinalCompletionTimeMs(elapsedMs);
       setScreen("win");
       gameActiveRef.current = false;
 
       if (actor) {
         try {
-          await actor.saveGameResult(BigInt(10), BigInt(totalDeaths));
+          await actor.saveGameResult(
+            BigInt(10),
+            BigInt(totalDeaths),
+            BigInt(elapsedMs),
+          );
           await loadLeaderboard();
         } catch {
           // Silently fail
@@ -514,6 +708,7 @@ export default function App() {
       setDeaths(0);
       setDrumActive(false);
       gameActiveRef.current = true;
+      startTimeRef.current = Date.now();
       setIsLoading(false);
     }, 100);
   }, []);
@@ -526,41 +721,162 @@ export default function App() {
     setDrumActive(active);
   }, []);
 
+  // Custom level game over (from playing_custom)
+  const handleCustomGameOver = useCallback(
+    (_stageReached: number, totalDeaths: number) => {
+      setFinalDeaths(totalDeaths);
+      setFinalStage(99);
+      setScreen("gameover");
+      gameActiveRef.current = false;
+    },
+    [],
+  );
+
+  const handleCustomWin = useCallback((totalDeaths: number) => {
+    setFinalDeaths(totalDeaths);
+    setFinalStage(99);
+    setScreen("win");
+    gameActiveRef.current = false;
+  }, []);
+
+  // Editor handlers
+  const handleEditorTest = useCallback((stage: StageConfig) => {
+    setCustomStageToPlay(stage);
+    setScreen("playing_custom");
+    setStage(99);
+    setLives(3);
+    setDeaths(0);
+    setDrumActive(false);
+    gameActiveRef.current = true;
+  }, []);
+
+  const handleEditorPublish = useCallback(
+    async (stage: StageConfig) => {
+      if (!actor) throw new Error("Not connected");
+      await actor.saveCustomLevel(
+        stage.name,
+        JSON.stringify(stage.platforms),
+        BigInt(stage.worldWidth),
+        BigInt(stage.bgHue),
+      );
+      setUserExistingLevel({
+        name: stage.name,
+        platformsJson: JSON.stringify(stage.platforms),
+        worldWidth: stage.worldWidth,
+        bgHue: stage.bgHue,
+      });
+    },
+    [actor],
+  );
+
+  // Community play handler
+  const handlePlayCommunityLevel = useCallback(
+    (level: {
+      name: string;
+      platformsJson: string;
+      worldWidth: number;
+      bgHue: number;
+    }) => {
+      const stage = buildCustomStageFromLevel(level);
+      setCustomStageToPlay(stage);
+      setScreen("playing_custom");
+      setStage(99);
+      setLives(3);
+      setDeaths(0);
+      setDrumActive(false);
+      gameActiveRef.current = true;
+    },
+    [],
+  );
+
   const year = new Date().getFullYear();
   const hostname =
     typeof window !== "undefined"
       ? encodeURIComponent(window.location.hostname)
       : "";
 
+  const isCustomLevel = screen === "playing_custom";
+  const isGameplaying = screen === "playing" || screen === "playing_custom";
+  const isNonGameScreen =
+    screen === "editor" || screen === "community" || screen === "leaderboard";
+
   return (
     <div className="game-container">
-      {/* Canvas game always mounted */}
-      <ObbyCoreGame
-        onDeath={handleDeath}
-        onStageChange={handleStageChange}
-        onGameOver={handleGameOver}
-        onWin={handleWin}
-        onCheckpoint={handleCheckpoint}
-        gameActive={screen === "playing"}
-        drumPulseSignal={handleDrumPulse}
-      />
+      {/* Canvas game - hidden when editor, community, or leaderboard is open */}
+      <div
+        style={{
+          display: isNonGameScreen ? "none" : "block",
+          width: "100%",
+          height: "100%",
+        }}
+      >
+        <ObbyCoreGame
+          onDeath={handleDeath}
+          onStageChange={handleStageChange}
+          onGameOver={isCustomLevel ? handleCustomGameOver : handleGameOver}
+          onWin={isCustomLevel ? handleCustomWin : handleWin}
+          onCheckpoint={handleCheckpoint}
+          gameActive={isGameplaying}
+          drumPulseSignal={handleDrumPulse}
+          customStage={
+            isCustomLevel ? (customStageToPlay ?? undefined) : undefined
+          }
+        />
+      </div>
 
-      {/* Fog + scanlines overlay */}
-      <div className="fog-overlay" />
-      <div className="scanlines" />
+      {/* Editor screen */}
+      {screen === "editor" && (
+        <LevelEditor
+          onBack={() => setScreen("start")}
+          onTestLevel={handleEditorTest}
+          onPublish={handleEditorPublish}
+          existingLevel={userExistingLevel}
+        />
+      )}
+
+      {/* Community screen */}
+      {screen === "community" && (
+        <CommunityLevels
+          onBack={() => setScreen("start")}
+          onPlayLevel={handlePlayCommunityLevel}
+        />
+      )}
+
+      {/* Leaderboard screen */}
+      {screen === "leaderboard" && (
+        <LeaderboardScreen
+          leaderboard={leaderboard}
+          speedLeaderboard={speedLeaderboard}
+          isLoading={isLeaderboardLoading}
+          onBack={() => setScreen("start")}
+        />
+      )}
+
+      {/* Fog + scanlines overlay (only during gameplay) */}
+      {!isNonGameScreen && (
+        <>
+          <div className="fog-overlay" />
+          <div className="scanlines" />
+        </>
+      )}
 
       {/* HUD (only during gameplay) */}
-      {screen === "playing" && (
+      {isGameplaying && (
         <HUD
           stage={stage}
           lives={lives}
           deaths={deaths}
           drumActive={drumActive}
+          isCustomLevel={isCustomLevel}
+          onMenu={() => {
+            gameActiveRef.current = false;
+            setScreen("start");
+          }}
         />
       )}
 
       {/* Touch controls (only during gameplay) */}
-      {screen === "playing" && (
+      {isGameplaying && (
         <TouchControls
           onJump={() => {
             /* jump handled via touch events in canvas */
@@ -572,6 +888,12 @@ export default function App() {
       {screen === "start" && (
         <StartScreen
           onStart={handleStart}
+          onEditor={() => setScreen("editor")}
+          onCommunity={() => setScreen("community")}
+          onLeaderboard={() => {
+            loadLeaderboard();
+            setScreen("leaderboard");
+          }}
           leaderboard={leaderboard}
           personalBest={personalBest}
           isLoading={isLoading}
@@ -581,8 +903,10 @@ export default function App() {
       {screen === "win" && (
         <WinScreen
           deaths={finalDeaths}
-          onReplay={handleRetry}
+          onReplay={isCustomLevel ? () => setScreen("start") : handleRetry}
           leaderboard={leaderboard}
+          isCustomLevel={finalStage === 99}
+          completionTimeMs={finalCompletionTimeMs}
         />
       )}
 
@@ -590,21 +914,24 @@ export default function App() {
         <GameOverScreen
           deaths={finalDeaths}
           stage={finalStage}
-          onRetry={handleRetry}
+          onRetry={finalStage === 99 ? () => setScreen("start") : handleRetry}
+          isCustomLevel={finalStage === 99}
         />
       )}
 
       {/* Footer */}
-      <footer className="game-footer">
-        © {year}.{" "}
-        <a
-          href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${hostname}`}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Built with ❤ using caffeine.ai
-        </a>
-      </footer>
+      {!isNonGameScreen && (
+        <footer className="game-footer">
+          © {year}.{" "}
+          <a
+            href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${hostname}`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Built with ❤ using caffeine.ai
+          </a>
+        </footer>
+      )}
     </div>
   );
 }
