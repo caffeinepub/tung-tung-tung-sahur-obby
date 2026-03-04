@@ -9,6 +9,132 @@ import type { Platform, StageConfig } from "./components/ObbyCoreGame";
 import { useActor } from "./hooks/useActor";
 
 // ===================================================
+// OWNER TAG
+// ===================================================
+
+const OWNER_USERNAME = "tung_master";
+function isOwner(name: string | null | undefined): boolean {
+  return name === OWNER_USERNAME;
+}
+
+// ===================================================
+// USERNAME VALIDATION
+// ===================================================
+
+function validateUsername(name: string): string | null {
+  if (name.length < 3) return "Username must be at least 3 characters.";
+  if (name.length > 20) return "Username must be 20 characters or less.";
+  if (!/^[a-zA-Z0-9_]+$/.test(name))
+    return "Only letters, numbers, and underscores are allowed.";
+  return null;
+}
+
+// ===================================================
+// USERNAME SETUP MODAL
+// ===================================================
+
+interface UsernameModalProps {
+  onConfirm: (name: string) => Promise<void>;
+}
+
+function UsernameModal({ onConfirm }: UsernameModalProps) {
+  const [value, setValue] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = value.trim();
+    if (trimmed.toLowerCase() === "tung_master") {
+      setError("That username is reserved.");
+      return;
+    }
+    const validationError = validateUsername(trimmed);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      await onConfirm(trimmed);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (
+        msg.toLowerCase().includes("already") ||
+        msg.toLowerCase().includes("taken")
+      ) {
+        setError("That name is already taken. Try another one.");
+      } else if (
+        msg.toLowerCase().includes("has username") ||
+        msg.toLowerCase().includes("already registered")
+      ) {
+        setError("You already have a username registered.");
+      } else {
+        setError("Something went wrong. Please try again.");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="username-modal-overlay" data-ocid="username.modal">
+      <div className="username-modal-bg" />
+      <div className="username-modal-card">
+        <div className="username-modal-icon" aria-hidden="true">
+          🥁
+        </div>
+        <h2 className="username-modal-title">CHOOSE YOUR NAME</h2>
+        <p className="username-modal-subtitle">
+          Pick a unique name to appear on the leaderboard
+        </p>
+        <form onSubmit={handleSubmit} className="username-modal-form">
+          <div className="username-input-wrapper">
+            <input
+              type="text"
+              className="username-input"
+              placeholder="e.g. TungMaster99"
+              value={value}
+              onChange={(e) => {
+                setValue(e.target.value.slice(0, 20));
+                setError(null);
+              }}
+              maxLength={20}
+              disabled={isSubmitting}
+              data-ocid="username.input"
+              autoComplete="off"
+              spellCheck={false}
+            />
+            <span className="username-char-counter">{value.length}/20</span>
+          </div>
+          {error && (
+            <div className="username-error" data-ocid="username.error_state">
+              {error}
+            </div>
+          )}
+          <button
+            type="submit"
+            className={`game-button game-button-primary username-submit-btn ${isSubmitting ? "username-submit-loading" : ""}`}
+            disabled={isSubmitting || value.trim().length < 3}
+            data-ocid="username.submit_button"
+          >
+            {isSubmitting ? (
+              <span className="username-loading-ring" />
+            ) : (
+              "✓ CONFIRM NAME"
+            )}
+          </button>
+        </form>
+        <p className="username-modal-hint">
+          3–20 characters · letters, numbers, underscores only
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ===================================================
 // TYPES
 // ===================================================
 
@@ -53,7 +179,13 @@ function buildCustomStageFromLevel(level: {
 // LEADERBOARD SECTION
 // ===================================================
 
-function LeaderboardSection({ entries }: { entries: LeaderboardEntry[] }) {
+function LeaderboardSection({
+  entries,
+  usernameMap,
+}: {
+  entries: LeaderboardEntry[];
+  usernameMap?: Map<string, string>;
+}) {
   if (entries.length === 0) return null;
 
   const rankClasses = ["lb-rank-1", "lb-rank-2", "lb-rank-3"];
@@ -62,26 +194,44 @@ function LeaderboardSection({ entries }: { entries: LeaderboardEntry[] }) {
   return (
     <div className="leaderboard-card">
       <div className="leaderboard-title">Top Survivors</div>
-      {entries.map((entry, i) => (
-        <div key={entry.principal} className="leaderboard-row">
-          <span className={`lb-rank ${rankClasses[i] ?? ""}`}>
-            {rankEmoji[i] ?? `#${i + 1}`}
-          </span>
-          <span className="lb-principal" title={entry.principal}>
-            {entry.principal.slice(0, 8)}...{entry.principal.slice(-4)}
-          </span>
-          <span className="lb-stat">
-            <span>
-              Stage{" "}
-              <span className="lb-stat-val">{entry.bestStage.toString()}</span>
+      {entries.map((entry, i) => {
+        const displayName =
+          usernameMap?.get(entry.principal) ??
+          `${entry.principal.slice(0, 8)}...${entry.principal.slice(-4)}`;
+        const isUsername = !!usernameMap?.get(entry.principal);
+        return (
+          <div key={entry.principal} className="leaderboard-row">
+            <span className={`lb-rank ${rankClasses[i] ?? ""}`}>
+              {rankEmoji[i] ?? `#${i + 1}`}
             </span>
-            <span>
-              Wins{" "}
-              <span className="lb-stat-val">{entry.totalWins.toString()}</span>
+            <span
+              className={isUsername ? "lb-username" : "lb-principal"}
+              title={entry.principal}
+              style={
+                isOwner(displayName)
+                  ? { color: "#22c55e", textShadow: "0 0 6px #22c55e" }
+                  : {}
+              }
+            >
+              {isOwner(displayName) ? `👑 ${displayName}` : displayName}
             </span>
-          </span>
-        </div>
-      ))}
+            <span className="lb-stat">
+              <span>
+                Stage{" "}
+                <span className="lb-stat-val">
+                  {entry.bestStage.toString()}
+                </span>
+              </span>
+              <span>
+                Wins{" "}
+                <span className="lb-stat-val">
+                  {entry.totalWins.toString()}
+                </span>
+              </span>
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -139,6 +289,7 @@ interface StartScreenProps {
   leaderboard: LeaderboardEntry[];
   personalBest: bigint | null;
   isLoading: boolean;
+  username: string | null;
 }
 
 function StartScreen({
@@ -149,6 +300,7 @@ function StartScreen({
   leaderboard: _leaderboard,
   personalBest,
   isLoading,
+  username,
 }: StartScreenProps) {
   return (
     <div className="screen-overlay">
@@ -223,6 +375,22 @@ function StartScreen({
         <p className="game-subtitle">
           Can you escape the creature? 10 stages of terror await.
         </p>
+
+        {username && (
+          <div className="playing-as-badge" data-ocid="start.username_badge">
+            <span className="playing-as-label">Playing as</span>
+            <span
+              className="playing-as-name"
+              style={
+                isOwner(username)
+                  ? { color: "#22c55e", textShadow: "0 0 8px #22c55e" }
+                  : {}
+              }
+            >
+              {isOwner(username) ? `👑 ${username}` : username}
+            </span>
+          </div>
+        )}
 
         {personalBest !== null && (
           <div className="personal-best">
@@ -305,6 +473,7 @@ interface WinScreenProps {
   leaderboard: LeaderboardEntry[];
   isCustomLevel?: boolean;
   completionTimeMs?: number;
+  usernameMap?: Map<string, string>;
 }
 
 function WinScreen({
@@ -313,6 +482,7 @@ function WinScreen({
   leaderboard,
   isCustomLevel,
   completionTimeMs,
+  usernameMap,
 }: WinScreenProps) {
   return (
     <div className="screen-overlay">
@@ -363,7 +533,9 @@ function WinScreen({
           )}
         </div>
 
-        {!isCustomLevel && <LeaderboardSection entries={leaderboard} />}
+        {!isCustomLevel && (
+          <LeaderboardSection entries={leaderboard} usernameMap={usernameMap} />
+        )}
 
         <button
           type="button"
@@ -441,6 +613,7 @@ interface HUDProps {
   drumActive: boolean;
   isCustomLevel?: boolean;
   onMenu: () => void;
+  username?: string | null;
 }
 
 function HUD({
@@ -450,6 +623,7 @@ function HUD({
   drumActive,
   isCustomLevel,
   onMenu,
+  username,
 }: HUDProps) {
   return (
     <div className="game-hud">
@@ -474,6 +648,23 @@ function HUD({
         <div className="hud-panel hud-deaths" data-ocid="hud.deaths_panel">
           💀 {deaths}
         </div>
+        {username &&
+          (isOwner(username) ? (
+            <div
+              className="hud-panel hud-username"
+              data-ocid="hud.username_panel"
+              style={{ color: "#22c55e", textShadow: "0 0 8px #22c55e" }}
+            >
+              👑 {username}
+            </div>
+          ) : (
+            <div
+              className="hud-panel hud-username"
+              data-ocid="hud.username_panel"
+            >
+              👤 {username}
+            </div>
+          ))}
       </div>
       <div className="hud-bottom">
         <DrumPulse active={drumActive} />
@@ -539,6 +730,15 @@ export default function App() {
   const [finalStage, setFinalStage] = useState(1);
   const [finalCompletionTimeMs, setFinalCompletionTimeMs] = useState(0);
 
+  // Username state
+  const [username, setUsername] = useState<string | null>(() => {
+    return localStorage.getItem("obby_username");
+  });
+  const [showUsernameModal, setShowUsernameModal] = useState(false);
+  const [usernameMap, setUsernameMap] = useState<Map<string, string>>(
+    new Map(),
+  );
+
   // Timer for speed runs
   const startTimeRef = useRef<number | null>(null);
 
@@ -559,11 +759,19 @@ export default function App() {
     if (!actor) return;
     setIsLeaderboardLoading(true);
     try {
-      const [lb, speedLb, stats] = await Promise.all([
+      const [lb, speedLb, stats, allUsernames] = await Promise.all([
         actor.getLeaderboard(),
         actor.getSpeedLeaderboard(),
         actor.getMyStats(),
+        actor.getAllUsernames(),
       ]);
+
+      // Build username map from principal string -> username
+      const uMap = new Map<string, string>();
+      for (const [principal, uname] of allUsernames) {
+        uMap.set(principal.toString(), uname);
+      }
+      setUsernameMap(uMap);
 
       const entries: LeaderboardEntry[] = lb
         .map(([principal, userStats]) => ({
@@ -629,6 +837,70 @@ export default function App() {
       loadUserLevel();
     }
   }, [actor, loadLeaderboard, loadUserLevel]);
+
+  // On actor ready, check username status
+  useEffect(() => {
+    if (!actor) return;
+    const checkUsername = async () => {
+      try {
+        const backendName = await actor.getMyUsername();
+        if (backendName) {
+          // Confirmed from backend — save and use
+          localStorage.setItem("obby_username", backendName);
+          setUsername(backendName);
+          setShowUsernameModal(false);
+        } else {
+          // No name in backend
+          const localName = localStorage.getItem("obby_username");
+          if (!localName) {
+            // No name anywhere — show modal
+            setShowUsernameModal(true);
+          } else {
+            // Had local but backend lost it — re-register or show modal
+            setShowUsernameModal(true);
+          }
+        }
+      } catch {
+        // Silently fail — don't block gameplay
+      }
+    };
+    checkUsername();
+  }, [actor]);
+
+  // Handle username registration
+  const handleConfirmUsername = useCallback(
+    async (name: string) => {
+      if (!actor) throw new Error("Not connected");
+      try {
+        await actor.registerUsername(name);
+        localStorage.setItem("obby_username", name);
+        setUsername(name);
+        setShowUsernameModal(false);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        // Check if they already have a username (edge case)
+        if (
+          msg.toLowerCase().includes("already") ||
+          msg.toLowerCase().includes("username already")
+        ) {
+          // Try to retrieve their existing name
+          try {
+            const existing = await actor.getMyUsername();
+            if (existing) {
+              localStorage.setItem("obby_username", existing);
+              setUsername(existing);
+              setShowUsernameModal(false);
+              return;
+            }
+          } catch {
+            // Fall through to throw original error
+          }
+        }
+        throw err;
+      }
+    },
+    [actor],
+  );
 
   const handleStart = useCallback(() => {
     setScreen("playing");
@@ -849,6 +1121,7 @@ export default function App() {
           speedLeaderboard={speedLeaderboard}
           isLoading={isLeaderboardLoading}
           onBack={() => setScreen("start")}
+          usernameMap={usernameMap}
         />
       )}
 
@@ -872,6 +1145,7 @@ export default function App() {
             gameActiveRef.current = false;
             setScreen("start");
           }}
+          username={username}
         />
       )}
 
@@ -897,6 +1171,7 @@ export default function App() {
           leaderboard={leaderboard}
           personalBest={personalBest}
           isLoading={isLoading}
+          username={username}
         />
       )}
 
@@ -907,6 +1182,7 @@ export default function App() {
           leaderboard={leaderboard}
           isCustomLevel={finalStage === 99}
           completionTimeMs={finalCompletionTimeMs}
+          usernameMap={usernameMap}
         />
       )}
 
@@ -932,6 +1208,9 @@ export default function App() {
           </a>
         </footer>
       )}
+
+      {/* Username setup modal — blocks everything when shown */}
+      {showUsernameModal && <UsernameModal onConfirm={handleConfirmUsername} />}
     </div>
   );
 }

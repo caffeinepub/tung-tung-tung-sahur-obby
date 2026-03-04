@@ -18,6 +18,15 @@ export interface SpeedLeaderboardEntry {
 }
 
 // ===================================================
+// OWNER TAG
+// ===================================================
+
+const OWNER_USERNAME = "tung_master";
+function isOwner(name: string): boolean {
+  return name === OWNER_USERNAME;
+}
+
+// ===================================================
 // HELPERS
 // ===================================================
 
@@ -51,9 +60,11 @@ function RankMedal({ rank }: { rank: number }) {
 function SpeedRow({
   entry,
   rank,
+  usernameMap,
 }: {
   entry: SpeedLeaderboardEntry;
   rank: number;
+  usernameMap?: Map<string, string>;
 }) {
   const rowClass =
     rank === 0
@@ -64,11 +75,23 @@ function SpeedRow({
           ? "lb-full-row lb-full-row-bronze"
           : "lb-full-row";
 
+  const displayName =
+    usernameMap?.get(entry.principal) ?? shortenPrincipal(entry.principal);
+  const isUsername = !!usernameMap?.get(entry.principal);
+
   return (
     <div className={rowClass}>
       <RankMedal rank={rank} />
-      <span className="lb-full-principal" title={entry.principal}>
-        {shortenPrincipal(entry.principal)}
+      <span
+        className={isUsername ? "lb-full-username" : "lb-full-principal"}
+        title={entry.principal}
+        style={
+          isOwner(displayName)
+            ? { color: "#22c55e", textShadow: "0 0 6px #22c55e" }
+            : {}
+        }
+      >
+        {isOwner(displayName) ? `👑 ${displayName}` : displayName}
       </span>
       <span className="lb-full-time">
         ⏱ {formatTime(Number(entry.bestCompletionTimeMs))}
@@ -84,9 +107,11 @@ function SpeedRow({
 function TopRow({
   entry,
   rank,
+  usernameMap,
 }: {
   entry: LeaderboardEntry;
   rank: number;
+  usernameMap?: Map<string, string>;
 }) {
   const rowClass =
     rank === 0
@@ -97,11 +122,23 @@ function TopRow({
           ? "lb-full-row lb-full-row-bronze"
           : "lb-full-row";
 
+  const displayName =
+    usernameMap?.get(entry.principal) ?? shortenPrincipal(entry.principal);
+  const isUsername = !!usernameMap?.get(entry.principal);
+
   return (
     <div className={rowClass}>
       <RankMedal rank={rank} />
-      <span className="lb-full-principal" title={entry.principal}>
-        {shortenPrincipal(entry.principal)}
+      <span
+        className={isUsername ? "lb-full-username" : "lb-full-principal"}
+        title={entry.principal}
+        style={
+          isOwner(displayName)
+            ? { color: "#22c55e", textShadow: "0 0 6px #22c55e" }
+            : {}
+        }
+      >
+        {isOwner(displayName) ? `👑 ${displayName}` : displayName}
       </span>
       <span className="lb-full-stats">
         <span className="lb-full-stat-item">
@@ -126,6 +163,7 @@ interface LeaderboardScreenProps {
   speedLeaderboard: SpeedLeaderboardEntry[];
   isLoading: boolean;
   onBack: () => void;
+  usernameMap?: Map<string, string>;
 }
 
 export default function LeaderboardScreen({
@@ -133,6 +171,7 @@ export default function LeaderboardScreen({
   speedLeaderboard,
   isLoading,
   onBack,
+  usernameMap,
 }: LeaderboardScreenProps) {
   return (
     <div className="screen-overlay lb-full-screen">
@@ -213,7 +252,12 @@ export default function LeaderboardScreen({
                       <span>Time</span>
                     </div>
                     {speedLeaderboard.map((entry, i) => (
-                      <SpeedRow key={entry.principal} entry={entry} rank={i} />
+                      <SpeedRow
+                        key={entry.principal}
+                        entry={entry}
+                        rank={i}
+                        usernameMap={usernameMap}
+                      />
                     ))}
                   </>
                 )}
@@ -242,7 +286,12 @@ export default function LeaderboardScreen({
                       <span>Stats</span>
                     </div>
                     {leaderboard.map((entry, i) => (
-                      <TopRow key={entry.principal} entry={entry} rank={i} />
+                      <TopRow
+                        key={entry.principal}
+                        entry={entry}
+                        rank={i}
+                        usernameMap={usernameMap}
+                      />
                     ))}
                   </>
                 )}

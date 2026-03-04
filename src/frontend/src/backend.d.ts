@@ -24,11 +24,15 @@ export interface CustomLevel {
 }
 export interface backendInterface {
     deleteMyLevel(): Promise<void>;
+    getAllUsernames(): Promise<Array<[Principal, string]>>;
     getLeaderboard(): Promise<Array<[Principal, UserStats]>>;
     getMyLevel(): Promise<CustomLevel | null>;
     getMyStats(): Promise<UserStats>;
+    getMyUsername(): Promise<string | null>;
     getPublicLevels(): Promise<Array<CustomLevel>>;
     getSpeedLeaderboard(): Promise<Array<[Principal, UserStats]>>;
+    getUsernameForPrincipal(p: Principal): Promise<string | null>;
+    registerUsername(name: string): Promise<void>;
     saveCustomLevel(name: string, platformsJson: string, worldWidth: bigint, bgHue: bigint): Promise<void>;
     saveGameResult(stageReached: bigint, deathsThisRun: bigint, completionTimeMs: bigint): Promise<void>;
 }

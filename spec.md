@@ -1,36 +1,27 @@
 # Tung Tung Tung Sahur Obby
 
 ## Current State
-- Backend tracks `bestStage`, `totalDeaths`, `totalWins` per player
-- `saveGameResult(stageReached, deathsThisRun)` records stats
-- `getLeaderboard()` returns top 10 sorted by bestStage then fewest deaths
-- Frontend shows a small inline "Top Survivors" leaderboard on start/win screens (top 3 entries)
-- No time tracking exists
+A 10-stage platformer obby game with username system, leaderboard (fastest times + top players), level editor, and community levels. Usernames are stored in the backend and displayed in the HUD, start screen, and leaderboard.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Backend: `bestCompletionTimeMs` field (Nat) in UserStats — 0 means never completed
-- Backend: `saveGameResult` accepts a new `completionTimeMs` arg (Nat); updates `bestCompletionTimeMs` only when it's a full win (stage 10) and time is better than existing best (or first completion)
-- Backend: `getSpeedLeaderboard()` query returning top 10 players who have completed the game, sorted by fastest `bestCompletionTimeMs`
-- Frontend: `GameScreen` type gains `"leaderboard"` value
-- Frontend: Full `LeaderboardScreen` component with two tabs — "Fastest Times" (completions only, sorted by time) and "Top Players" (sorted by best stage then fewest deaths)
-- Frontend: "🏆 LEADERBOARD" button on start screen navigating to leaderboard screen
-- Frontend: Time tracking in game — start timer when game starts, stop on win, pass elapsed ms to `saveGameResult`
-- Frontend: Display formatted time (mm:ss.ms) in win screen stats row
+- Owner tag logic: the username `tung_master` is hardcoded as the owner
+- A helper function `isOwner(name: string): boolean` that returns true when name === "tung_master"
+- Wherever a username is displayed, if `isOwner(name)` is true, render the name in green (`#22c55e` / Tailwind `text-green-500`) with a small crown emoji prefix (👑) to distinguish the owner
 
 ### Modify
-- Backend: `saveGameResult` signature gains third param `completionTimeMs : Nat`
-- Frontend: `handleWin` passes elapsed time to `saveGameResult`
-- Frontend: `WinScreen` shows time stat when available
-- Frontend: Start screen leaderboard replaced by a button linking to the new full leaderboard screen
+- `App.tsx` — `StartScreen`: the "Playing as" badge should show the username in green with crown if owner
+- `App.tsx` — `HUD`: the username panel should show username in green with crown if owner
+- `App.tsx` — `LeaderboardSection` (mini leaderboard on win screen): apply green + crown to owner name
+- `Leaderboard.tsx` — `SpeedRow` and `TopRow`: apply green + crown to owner name when displayed
 
 ### Remove
-- Frontend: Inline `LeaderboardSection` on start screen (replaced by dedicated screen)
+- Nothing removed
 
 ## Implementation Plan
-1. Update `main.mo`: add `bestCompletionTimeMs` to `UserStats`, update `saveGameResult` to accept and store time, add `getSpeedLeaderboard()` sorted by time
-2. Update frontend `App.tsx`: add `leaderboard` screen type, timer ref, pass time to backend, wire leaderboard button
-3. Create `Leaderboard.tsx` component with Fastest Times / Top Players tabs
-4. Update start screen to show leaderboard button instead of inline entries
-5. Update win screen to show formatted completion time
+1. Add a shared `OWNER_USERNAME` constant (`"tung_master"`) and `isOwner(name: string)` helper near the top of `App.tsx` (or a shared util)
+2. In `App.tsx` `StartScreen`, wrap the username span: if owner, add `👑 ` prefix and green inline style
+3. In `App.tsx` `HUD`, wrap the username display: if owner, apply green color and crown prefix
+4. In `App.tsx` `LeaderboardSection`, when rendering `displayName`, check owner and apply green style + crown
+5. In `Leaderboard.tsx` `SpeedRow` and `TopRow`, after resolving `displayName`, check if `displayName === OWNER_USERNAME` (or pass a helper) and apply green style + crown prefix

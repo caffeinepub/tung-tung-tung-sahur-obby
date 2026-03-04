@@ -106,11 +106,15 @@ export interface CustomLevel {
 }
 export interface backendInterface {
     deleteMyLevel(): Promise<void>;
+    getAllUsernames(): Promise<Array<[Principal, string]>>;
     getLeaderboard(): Promise<Array<[Principal, UserStats]>>;
     getMyLevel(): Promise<CustomLevel | null>;
     getMyStats(): Promise<UserStats>;
+    getMyUsername(): Promise<string | null>;
     getPublicLevels(): Promise<Array<CustomLevel>>;
     getSpeedLeaderboard(): Promise<Array<[Principal, UserStats]>>;
+    getUsernameForPrincipal(p: Principal): Promise<string | null>;
+    registerUsername(name: string): Promise<void>;
     saveCustomLevel(name: string, platformsJson: string, worldWidth: bigint, bgHue: bigint): Promise<void>;
     saveGameResult(stageReached: bigint, deathsThisRun: bigint, completionTimeMs: bigint): Promise<void>;
 }
@@ -128,6 +132,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.deleteMyLevel();
+            return result;
+        }
+    }
+    async getAllUsernames(): Promise<Array<[Principal, string]>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getAllUsernames();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getAllUsernames();
             return result;
         }
     }
@@ -173,6 +191,20 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async getMyUsername(): Promise<string | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getMyUsername();
+                return from_candid_opt_n2(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getMyUsername();
+            return from_candid_opt_n2(this._uploadFile, this._downloadFile, result);
+        }
+    }
     async getPublicLevels(): Promise<Array<CustomLevel>> {
         if (this.processError) {
             try {
@@ -198,6 +230,34 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.getSpeedLeaderboard();
+            return result;
+        }
+    }
+    async getUsernameForPrincipal(arg0: Principal): Promise<string | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getUsernameForPrincipal(arg0);
+                return from_candid_opt_n2(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getUsernameForPrincipal(arg0);
+            return from_candid_opt_n2(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async registerUsername(arg0: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.registerUsername(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.registerUsername(arg0);
             return result;
         }
     }
@@ -231,6 +291,9 @@ export class Backend implements backendInterface {
     }
 }
 function from_candid_opt_n1(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_CustomLevel]): CustomLevel | null {
+    return value.length === 0 ? null : value[0];
+}
+function from_candid_opt_n2(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [string]): string | null {
     return value.length === 0 ? null : value[0];
 }
 export interface CreateActorOptions {

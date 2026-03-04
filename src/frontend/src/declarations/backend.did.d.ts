@@ -27,11 +27,15 @@ export interface UserStats {
 }
 export interface _SERVICE {
   'deleteMyLevel' : ActorMethod<[], undefined>,
+  'getAllUsernames' : ActorMethod<[], Array<[Principal, string]>>,
   'getLeaderboard' : ActorMethod<[], Array<[Principal, UserStats]>>,
   'getMyLevel' : ActorMethod<[], [] | [CustomLevel]>,
   'getMyStats' : ActorMethod<[], UserStats>,
+  'getMyUsername' : ActorMethod<[], [] | [string]>,
   'getPublicLevels' : ActorMethod<[], Array<CustomLevel>>,
   'getSpeedLeaderboard' : ActorMethod<[], Array<[Principal, UserStats]>>,
+  'getUsernameForPrincipal' : ActorMethod<[Principal], [] | [string]>,
+  'registerUsername' : ActorMethod<[string], undefined>,
   'saveCustomLevel' : ActorMethod<[string, string, bigint, bigint], undefined>,
   'saveGameResult' : ActorMethod<[bigint, bigint, bigint], undefined>,
 }

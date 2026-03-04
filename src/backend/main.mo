@@ -8,9 +8,10 @@ import Time "mo:core/Time";
 import Text "mo:core/Text";
 import Nat "mo:core/Nat";
 import Int "mo:core/Int";
-import Migration "migration";
+import Char "mo:core/Char";
 
-(with migration = Migration.run)
+
+
 actor {
   type UserStats = {
     bestStage : Nat;
@@ -52,6 +53,70 @@ actor {
 
   var nextLevelId = 1;
   let customLevels = Map.empty<Principal, CustomLevel>();
+
+  // Username system
+  let usernames = Map.empty<Text, Principal>();
+  let principalToUsername = Map.empty<Principal, Text>();
+
+  // Username registration
+  public shared ({ caller }) func registerUsername(name : Text) : async () {
+    let trimmed = name.trimStart(#char(' ')).trimEnd(#char(' '));
+    let len = trimmed.size();
+
+    if (len < 3 or len > 20) {
+      Runtime.trap("Username must be between 3 and 20 characters");
+    };
+
+    // Validate only letters, numbers, underscores
+    func isValidChar(c : Char) : Bool {
+      let code = c.toNat32();
+      // 0-9: 48-57, A-Z: 65-90, a-z: 97-122, underscore: 95
+      (code >= 48 and code <= 57) or (
+        code >= 65 and code <= 90
+      ) or (
+        code >= 97 and code <= 122
+      ) or code == 95;
+    };
+
+    let validUsername = trimmed.toArray().all(isValidChar);
+
+    if (not validUsername) {
+      Runtime.trap("Username can only contain letters, numbers, underscores");
+    };
+
+    switch (principalToUsername.get(caller)) {
+      case (?_) {
+        Runtime.trap("You have already registered a username");
+      };
+      case (null) {};
+    };
+
+    switch (usernames.get(trimmed)) {
+      case (?_) {
+        Runtime.trap("Username already taken");
+      };
+      case (null) {};
+    };
+
+    usernames.add(trimmed, caller);
+    principalToUsername.add(caller, trimmed);
+  };
+
+  // Get current user's username
+  public query ({ caller }) func getMyUsername() : async ?Text {
+    principalToUsername.get(caller);
+  };
+
+  // Get username for a given principal
+  public query ({ caller }) func getUsernameForPrincipal(p : Principal) : async ?Text {
+    principalToUsername.get(p);
+  };
+
+  // Get all usernames with principals
+  public query ({ caller }) func getAllUsernames() : async [(Principal, Text)] {
+    let entriesArray = principalToUsername.entries().toArray();
+    entriesArray;
+  };
 
   // Save or update a player's game stats
   public shared ({ caller }) func saveGameResult(stageReached : Nat, deathsThisRun : Nat, completionTimeMs : Nat) : async () {

@@ -1048,3 +1048,271 @@
 .lb-nav-btn:active {
   transform: scale(0.97);
 }
+
+/* ===================== USERNAME IN LEADERBOARD ===================== */
+
+.lb-username {
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--neon-purple);
+  text-shadow: 0 0 8px rgba(168, 85, 247, 0.5);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 8px;
+}
+
+.lb-full-username {
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--neon-purple);
+  text-shadow: 0 0 8px rgba(168, 85, 247, 0.5);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 8px;
+}
+
+/* ===================== PLAYING AS BADGE ===================== */
+
+.playing-as-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(168, 85, 247, 0.1);
+  border: 1px solid rgba(168, 85, 247, 0.35);
+  border-radius: 20px;
+  padding: 7px 16px;
+  font-size: 13px;
+}
+
+.playing-as-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(168, 85, 247, 0.6);
+}
+
+.playing-as-name {
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-weight: 800;
+  color: var(--neon-purple);
+  text-shadow: 0 0 10px rgba(168, 85, 247, 0.5);
+  letter-spacing: 0.04em;
+}
+
+/* ===================== HUD USERNAME ===================== */
+
+.hud-username {
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--neon-purple);
+  text-shadow: 0 0 8px rgba(168, 85, 247, 0.5);
+  letter-spacing: 0.04em;
+}
+
+/* ===================== USERNAME MODAL ===================== */
+
+.username-modal-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  font-family: "Bricolage Grotesque", sans-serif;
+  padding: 20px;
+}
+
+.username-modal-bg {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 3, 15, 0.96);
+  backdrop-filter: blur(12px);
+}
+
+.username-modal-card {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  background: rgba(13, 8, 30, 0.92);
+  border: 1px solid rgba(168, 85, 247, 0.4);
+  border-radius: 16px;
+  padding: 40px 36px 32px;
+  max-width: 420px;
+  width: 100%;
+  box-shadow: 0 0 60px rgba(168, 85, 247, 0.25), 0 0 120px rgba(168, 85, 247, 0.08), inset 0 1px 0 rgba(168, 85, 247, 0.15);
+  animation: modalSlideIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.85) translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.username-modal-icon {
+  font-size: 48px;
+  animation: drumIconPulse 2s ease-in-out infinite alternate;
+  filter: drop-shadow(0 0 16px rgba(168, 85, 247, 0.6));
+}
+
+@keyframes drumIconPulse {
+  from { transform: scale(1) rotate(-5deg); filter: drop-shadow(0 0 12px rgba(168, 85, 247, 0.5)); }
+  to { transform: scale(1.08) rotate(5deg); filter: drop-shadow(0 0 24px rgba(232, 121, 249, 0.7)); }
+}
+
+.username-modal-title {
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: clamp(22px, 5vw, 30px);
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  text-align: center;
+  background: linear-gradient(135deg, #e879f9 0%, #a855f7 50%, #22d3ee 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin: 0;
+  filter: drop-shadow(0 0 20px rgba(168, 85, 247, 0.4));
+}
+
+.username-modal-subtitle {
+  font-size: 14px;
+  color: rgba(200, 180, 255, 0.7);
+  text-align: center;
+  margin: -4px 0 0;
+  font-family: "Sora", sans-serif;
+  font-weight: 400;
+}
+
+.username-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.username-input-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.username-input {
+  width: 100%;
+  background: rgba(168, 85, 247, 0.06);
+  border: 1px solid rgba(168, 85, 247, 0.4);
+  border-radius: 10px;
+  padding: 13px 50px 13px 16px;
+  font-family: "Sora", monospace;
+  font-size: 15px;
+  font-weight: 600;
+  color: #e0d0ff;
+  letter-spacing: 0.04em;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  box-sizing: border-box;
+}
+
+.username-input::placeholder {
+  color: rgba(168, 85, 247, 0.3);
+  font-weight: 400;
+}
+
+.username-input:focus {
+  border-color: rgba(168, 85, 247, 0.8);
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.15), 0 0 20px rgba(168, 85, 247, 0.2);
+}
+
+.username-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.username-char-counter {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: "Sora", monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(168, 85, 247, 0.5);
+  pointer-events: none;
+}
+
+.username-error {
+  background: rgba(248, 113, 113, 0.1);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  border-radius: 8px;
+  padding: 9px 14px;
+  font-family: "Sora", sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(248, 113, 113, 0.9);
+  text-align: center;
+  animation: errorShake 0.3s ease;
+}
+
+@keyframes errorShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+
+.username-submit-btn {
+  width: 100%;
+  padding: 14px 24px !important;
+  font-size: 16px !important;
+  position: relative;
+  animation: submitBtnPulse 2.5s ease-in-out infinite alternate;
+}
+
+@keyframes submitBtnPulse {
+  from { box-shadow: 0 0 20px rgba(168, 85, 247, 0.4), 0 4px 15px rgba(168, 85, 247, 0.2); }
+  to { box-shadow: 0 0 40px rgba(232, 121, 249, 0.6), 0 4px 25px rgba(232, 121, 249, 0.3); }
+}
+
+.username-submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+  animation: none;
+}
+
+.username-submit-loading {
+  animation: none !important;
+  opacity: 0.8;
+}
+
+.username-loading-ring {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid rgba(5, 3, 15, 0.3);
+  border-top-color: #05030f;
+  animation: spin 0.7s linear infinite;
+}
+
+.username-modal-hint {
+  font-family: "Sora", sans-serif;
+  font-size: 11px;
+  color: rgba(168, 85, 247, 0.4);
+  text-align: center;
+  margin: -6px 0 0;
+  letter-spacing: 0.04em;
+}

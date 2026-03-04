@@ -26,6 +26,11 @@ export const CustomLevel = IDL.Record({
 
 export const idlService = IDL.Service({
   'deleteMyLevel' : IDL.Func([], [], []),
+  'getAllUsernames' : IDL.Func(
+      [],
+      [IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Text))],
+      ['query'],
+    ),
   'getLeaderboard' : IDL.Func(
       [],
       [IDL.Vec(IDL.Tuple(IDL.Principal, UserStats))],
@@ -33,12 +38,19 @@ export const idlService = IDL.Service({
     ),
   'getMyLevel' : IDL.Func([], [IDL.Opt(CustomLevel)], ['query']),
   'getMyStats' : IDL.Func([], [UserStats], ['query']),
+  'getMyUsername' : IDL.Func([], [IDL.Opt(IDL.Text)], ['query']),
   'getPublicLevels' : IDL.Func([], [IDL.Vec(CustomLevel)], ['query']),
   'getSpeedLeaderboard' : IDL.Func(
       [],
       [IDL.Vec(IDL.Tuple(IDL.Principal, UserStats))],
       ['query'],
     ),
+  'getUsernameForPrincipal' : IDL.Func(
+      [IDL.Principal],
+      [IDL.Opt(IDL.Text)],
+      ['query'],
+    ),
+  'registerUsername' : IDL.Func([IDL.Text], [], []),
   'saveCustomLevel' : IDL.Func([IDL.Text, IDL.Text, IDL.Nat, IDL.Nat], [], []),
   'saveGameResult' : IDL.Func([IDL.Nat, IDL.Nat, IDL.Nat], [], []),
 });
@@ -64,6 +76,11 @@ export const idlFactory = ({ IDL }) => {
   
   return IDL.Service({
     'deleteMyLevel' : IDL.Func([], [], []),
+    'getAllUsernames' : IDL.Func(
+        [],
+        [IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Text))],
+        ['query'],
+      ),
     'getLeaderboard' : IDL.Func(
         [],
         [IDL.Vec(IDL.Tuple(IDL.Principal, UserStats))],
@@ -71,12 +88,19 @@ export const idlFactory = ({ IDL }) => {
       ),
     'getMyLevel' : IDL.Func([], [IDL.Opt(CustomLevel)], ['query']),
     'getMyStats' : IDL.Func([], [UserStats], ['query']),
+    'getMyUsername' : IDL.Func([], [IDL.Opt(IDL.Text)], ['query']),
     'getPublicLevels' : IDL.Func([], [IDL.Vec(CustomLevel)], ['query']),
     'getSpeedLeaderboard' : IDL.Func(
         [],
         [IDL.Vec(IDL.Tuple(IDL.Principal, UserStats))],
         ['query'],
       ),
+    'getUsernameForPrincipal' : IDL.Func(
+        [IDL.Principal],
+        [IDL.Opt(IDL.Text)],
+        ['query'],
+      ),
+    'registerUsername' : IDL.Func([IDL.Text], [], []),
     'saveCustomLevel' : IDL.Func(
         [IDL.Text, IDL.Text, IDL.Nat, IDL.Nat],
         [],
