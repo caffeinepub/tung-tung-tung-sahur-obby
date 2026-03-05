@@ -25,6 +25,8 @@ export const CustomLevel = IDL.Record({
 });
 
 export const idlService = IDL.Service({
+  'adminResetUsernames' : IDL.Func([], [], []),
+  'claimOwnerPrincipal' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'deleteLevel' : IDL.Func([IDL.Nat], [], []),
   'deleteMyLevel' : IDL.Func([], [], []),
   'getAllUsernames' : IDL.Func(
@@ -40,7 +42,7 @@ export const idlService = IDL.Service({
   'getLevelById' : IDL.Func([IDL.Nat], [IDL.Opt(CustomLevel)], ['query']),
   'getMyLevel' : IDL.Func([], [IDL.Opt(CustomLevel)], ['query']),
   'getMyLevels' : IDL.Func([], [IDL.Vec(CustomLevel)], ['query']),
-  'getMyStats' : IDL.Func([], [UserStats], ['query']),
+  'getMyStats' : IDL.Func([], [IDL.Opt(UserStats)], ['query']),
   'getMyUsername' : IDL.Func([], [IDL.Opt(IDL.Text)], ['query']),
   'getPublicLevels' : IDL.Func([], [IDL.Vec(CustomLevel)], ['query']),
   'getSpeedLeaderboard' : IDL.Func(
@@ -54,6 +56,7 @@ export const idlService = IDL.Service({
       ['query'],
     ),
   'registerUsername' : IDL.Func([IDL.Text], [], []),
+  'resetMyUsername' : IDL.Func([], [], []),
   'saveCustomLevel' : IDL.Func([IDL.Text, IDL.Text, IDL.Nat, IDL.Nat], [], []),
   'saveGameResult' : IDL.Func([IDL.Nat, IDL.Nat, IDL.Nat], [], []),
 });
@@ -78,6 +81,8 @@ export const idlFactory = ({ IDL }) => {
   });
   
   return IDL.Service({
+    'adminResetUsernames' : IDL.Func([], [], []),
+    'claimOwnerPrincipal' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'deleteLevel' : IDL.Func([IDL.Nat], [], []),
     'deleteMyLevel' : IDL.Func([], [], []),
     'getAllUsernames' : IDL.Func(
@@ -93,7 +98,7 @@ export const idlFactory = ({ IDL }) => {
     'getLevelById' : IDL.Func([IDL.Nat], [IDL.Opt(CustomLevel)], ['query']),
     'getMyLevel' : IDL.Func([], [IDL.Opt(CustomLevel)], ['query']),
     'getMyLevels' : IDL.Func([], [IDL.Vec(CustomLevel)], ['query']),
-    'getMyStats' : IDL.Func([], [UserStats], ['query']),
+    'getMyStats' : IDL.Func([], [IDL.Opt(UserStats)], ['query']),
     'getMyUsername' : IDL.Func([], [IDL.Opt(IDL.Text)], ['query']),
     'getPublicLevels' : IDL.Func([], [IDL.Vec(CustomLevel)], ['query']),
     'getSpeedLeaderboard' : IDL.Func(
@@ -107,6 +112,7 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'registerUsername' : IDL.Func([IDL.Text], [], []),
+    'resetMyUsername' : IDL.Func([], [], []),
     'saveCustomLevel' : IDL.Func(
         [IDL.Text, IDL.Text, IDL.Nat, IDL.Nat],
         [],

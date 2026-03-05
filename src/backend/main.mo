@@ -56,6 +56,9 @@ actor {
   let usernames = Map.empty<Text, Principal>();
   let principalToUsername = Map.empty<Principal, Text>();
 
+  // New persistent owner principal
+  var ownerPrincipal = "";
+
   // Username registration
   public shared ({ caller }) func registerUsername(name : Text) : async () {
     let trimmed = name.trimStart(#char(' ')).trimEnd(#char(' '));
@@ -104,9 +107,23 @@ actor {
     principalToUsername.add(caller, trimmed);
   };
 
-  // Get current user's username
+  // Fix the getMyUsername function to simply return the caller's entry
   public query ({ caller }) func getMyUsername() : async ?Text {
     principalToUsername.get(caller);
+  };
+
+  /// Allow users to reset/delete their own username
+  /// This removes entries from both maps, allowing the user to re-register a new name
+  public shared ({ caller }) func resetMyUsername() : async () {
+    switch (principalToUsername.get(caller)) {
+      case (null) {
+        Runtime.trap("No username found for the current user");
+      };
+      case (?username) {
+        principalToUsername.remove(caller);
+        usernames.remove(username);
+      };
+    };
   };
 
   // Get username for a given principal
@@ -164,13 +181,8 @@ actor {
   };
 
   // Get current user's stats
-  public query ({ caller }) func getMyStats() : async UserStats {
-    switch (stats.get(caller)) {
-      case (null) {
-        Runtime.trap("No stats found for current user");
-      };
-      case (?userStats) { userStats };
-    };
+  public query ({ caller }) func getMyStats() : async ?UserStats {
+    stats.get(caller);
   };
 
   // Get top 100 players for leaderboard
@@ -211,7 +223,6 @@ actor {
       Runtime.trap("Platforms JSON too large (max 50,000 characters)");
     };
 
-    // Check for 2 level limit
     let existingLevelsCount = customLevelsById.values().toArray().filter(
       func(level) { level.author == caller }
     ).size();
@@ -234,7 +245,6 @@ actor {
     nextLevelId += 1;
   };
 
-  // Get the most recently created level by the caller (backwards compatibility)
   public query ({ caller }) func getMyLevel() : async ?CustomLevel {
     var mostRecentLevel : ?CustomLevel = null;
     var latestTime : Int = 0;
@@ -249,7 +259,6 @@ actor {
     mostRecentLevel;
   };
 
-  // Get all levels created by the caller (up to 2), sorted by createdAt descending
   public query ({ caller }) func getMyLevels() : async [CustomLevel] {
     let allLevels = customLevelsById.values().toArray();
     let filteredLevels = allLevels.filter(
@@ -258,7 +267,6 @@ actor {
     filteredLevels.sort(CustomLevel.compareByCreatedAt);
   };
 
-  // Get up to 100 newest public custom levels
   public query func getPublicLevels() : async [CustomLevel] {
     let levelsArray = customLevelsById.values().toArray();
     let sortedLevels = levelsArray.sort(CustomLevel.compareByCreatedAt);
@@ -266,7 +274,6 @@ actor {
     sortedLevels.sliceToArray(0, levelsToTake);
   };
 
-  // Delete the most recently created level by the caller
   public shared ({ caller }) func deleteMyLevel() : async () {
     var mostRecentLevelId : ?Nat = null;
     var latestTime : Int = 0;
@@ -288,12 +295,10 @@ actor {
     };
   };
 
-  // Query (read-only) custom level by ID
   public query ({ caller }) func getLevelById(id : Nat) : async ?CustomLevel {
     customLevelsById.get(id);
   };
 
-  // Delete level by ID if caller is author
   public shared ({ caller }) func deleteLevel(id : Nat) : async () {
     switch (customLevelsById.get(id)) {
       case (null) { Runtime.trap("Level with id " # id.toText() # " not found") };
@@ -305,5 +310,27 @@ actor {
         customLevelsById.remove(id);
       };
     };
+  };
+
+  // New function to claim owner principal
+  public shared ({ caller }) func claimOwnerPrincipal(secret : Text) : async Bool {
+    if (secret == "tungmaster2024owner" and ownerPrincipal == "") {
+      ownerPrincipal := caller.toText();
+      true;
+    } else if (caller.toText() == ownerPrincipal and ownerPrincipal != "") {
+      true; // Already claimed by this caller
+    } else {
+      false;
+    };
+  };
+
+  // New admin function to reset all usernames (admin only)
+  public shared ({ caller }) func adminResetUsernames() : async () {
+    if (caller.toText() != ownerPrincipal or ownerPrincipal == "") {
+      Runtime.trap("Unauthorized");
+    };
+
+    usernames.clear();
+    principalToUsername.clear();
   };
 };

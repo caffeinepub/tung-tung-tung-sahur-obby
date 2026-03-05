@@ -26,6 +26,8 @@ export interface UserStats {
   'bestStage' : bigint,
 }
 export interface _SERVICE {
+  'adminResetUsernames' : ActorMethod<[], undefined>,
+  'claimOwnerPrincipal' : ActorMethod<[string], boolean>,
   'deleteLevel' : ActorMethod<[bigint], undefined>,
   'deleteMyLevel' : ActorMethod<[], undefined>,
   'getAllUsernames' : ActorMethod<[], Array<[Principal, string]>>,
@@ -33,12 +35,17 @@ export interface _SERVICE {
   'getLevelById' : ActorMethod<[bigint], [] | [CustomLevel]>,
   'getMyLevel' : ActorMethod<[], [] | [CustomLevel]>,
   'getMyLevels' : ActorMethod<[], Array<CustomLevel>>,
-  'getMyStats' : ActorMethod<[], UserStats>,
+  'getMyStats' : ActorMethod<[], [] | [UserStats]>,
   'getMyUsername' : ActorMethod<[], [] | [string]>,
   'getPublicLevels' : ActorMethod<[], Array<CustomLevel>>,
   'getSpeedLeaderboard' : ActorMethod<[], Array<[Principal, UserStats]>>,
   'getUsernameForPrincipal' : ActorMethod<[Principal], [] | [string]>,
   'registerUsername' : ActorMethod<[string], undefined>,
+  /**
+   * / Allow users to reset/delete their own username
+   * / This removes entries from both maps, allowing the user to re-register a new name
+   */
+  'resetMyUsername' : ActorMethod<[], undefined>,
   'saveCustomLevel' : ActorMethod<[string, string, bigint, bigint], undefined>,
   'saveGameResult' : ActorMethod<[bigint, bigint, bigint], undefined>,
 }

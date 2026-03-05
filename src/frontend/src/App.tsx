@@ -290,6 +290,7 @@ interface StartScreenProps {
   personalBest: bigint | null;
   isLoading: boolean;
   username: string | null;
+  onResetNames?: () => void;
 }
 
 function StartScreen({
@@ -301,6 +302,7 @@ function StartScreen({
   personalBest,
   isLoading,
   username,
+  onResetNames,
 }: StartScreenProps) {
   return (
     <div className="screen-overlay">
@@ -458,6 +460,25 @@ function StartScreen({
         >
           🏆 LEADERBOARD
         </button>
+
+        {isOwner(username) && onResetNames && (
+          <button
+            type="button"
+            className="game-button"
+            onClick={onResetNames}
+            data-ocid="start.reset_names_button"
+            style={{
+              marginTop: 8,
+              fontSize: 11,
+              padding: "6px 14px",
+              background: "rgba(239,68,68,0.15)",
+              border: "1px solid rgba(239,68,68,0.4)",
+              color: "rgba(239,68,68,0.8)",
+            }}
+          >
+            🔴 Reset All Names (Owner Only)
+          </button>
+        )}
       </div>
     </div>
   );
@@ -876,7 +897,7 @@ export default function App() {
       setLeaderboard(entries);
       setSpeedLeaderboard(speedEntries);
 
-      if (stats.bestStage > 0n) {
+      if (stats && stats.bestStage > 0n) {
         setPersonalBest(stats.bestStage);
       }
     } catch {
@@ -912,20 +933,22 @@ export default function App() {
   }, [actor, loadLeaderboard, loadUserLevel]);
 
   // On actor ready, check username status
+  // Always fetch from backend — never use localStorage, which is shared on the
+  // same device and would cause different users to see a previous player's name.
   useEffect(() => {
     if (!actor) return;
     const checkUsername = async () => {
       try {
         const backendName = await actor.getMyUsername();
         if (backendName) {
-          // Confirmed from backend — save and use
-          localStorage.setItem("obby_username", backendName);
+          // Confirmed from backend for this principal
           setUsername(backendName);
           setShowUsernameModal(false);
+          if (backendName === "tung_master") {
+            actor.claimOwnerPrincipal("tungmaster2024owner").catch(() => {});
+          }
         } else {
-          // No name in backend for this identity — clear any stale local
-          // cache so a different user doesn't inherit a previous player's name
-          localStorage.removeItem("obby_username");
+          // No name in backend for this principal — prompt to register
           setUsername(null);
           setShowUsernameModal(true);
         }
@@ -942,7 +965,6 @@ export default function App() {
       if (!actor) throw new Error("Not connected");
       try {
         await actor.registerUsername(name);
-        localStorage.setItem("obby_username", name);
         setUsername(name);
         setShowUsernameModal(false);
       } catch (err: unknown) {
@@ -952,11 +974,10 @@ export default function App() {
           msg.toLowerCase().includes("already") ||
           msg.toLowerCase().includes("username already")
         ) {
-          // Try to retrieve their existing name
+          // Try to retrieve their existing name from the backend
           try {
             const existing = await actor.getMyUsername();
             if (existing) {
-              localStorage.setItem("obby_username", existing);
               setUsername(existing);
               setShowUsernameModal(false);
               return;
@@ -1064,6 +1085,24 @@ export default function App() {
   const handleCheckpoint = useCallback(() => {
     // Checkpoint activated — just a feedback hook
   }, []);
+
+  const handleResetNames = useCallback(async () => {
+    if (!actor) return;
+    if (
+      !window.confirm(
+        "Reset ALL usernames? Everyone will need to re-register. This cannot be undone.",
+      )
+    )
+      return;
+    try {
+      await actor.adminResetUsernames();
+      // Clear own username state so owner is also re-prompted
+      setUsername(null);
+      setShowUsernameModal(true);
+    } catch (err) {
+      alert(`Failed to reset: ${String(err)}`);
+    }
+  }, [actor]);
 
   const handleDrumPulse = useCallback((active: boolean) => {
     setDrumActive(active);
@@ -1252,6 +1291,7 @@ export default function App() {
           personalBest={personalBest}
           isLoading={isLoading}
           username={username}
+          onResetNames={handleResetNames}
         />
       )}
 

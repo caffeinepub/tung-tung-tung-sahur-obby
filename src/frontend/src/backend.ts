@@ -105,6 +105,8 @@ export interface CustomLevel {
     bgHue: bigint;
 }
 export interface backendInterface {
+    adminResetUsernames(): Promise<void>;
+    claimOwnerPrincipal(secret: string): Promise<boolean>;
     deleteLevel(id: bigint): Promise<void>;
     deleteMyLevel(): Promise<void>;
     getAllUsernames(): Promise<Array<[Principal, string]>>;
@@ -112,18 +114,51 @@ export interface backendInterface {
     getLevelById(id: bigint): Promise<CustomLevel | null>;
     getMyLevel(): Promise<CustomLevel | null>;
     getMyLevels(): Promise<Array<CustomLevel>>;
-    getMyStats(): Promise<UserStats>;
+    getMyStats(): Promise<UserStats | null>;
     getMyUsername(): Promise<string | null>;
     getPublicLevels(): Promise<Array<CustomLevel>>;
     getSpeedLeaderboard(): Promise<Array<[Principal, UserStats]>>;
     getUsernameForPrincipal(p: Principal): Promise<string | null>;
     registerUsername(name: string): Promise<void>;
+    /**
+     * / Allow users to reset/delete their own username
+     * / This removes entries from both maps, allowing the user to re-register a new name
+     */
+    resetMyUsername(): Promise<void>;
     saveCustomLevel(name: string, platformsJson: string, worldWidth: bigint, bgHue: bigint): Promise<void>;
     saveGameResult(stageReached: bigint, deathsThisRun: bigint, completionTimeMs: bigint): Promise<void>;
 }
-import type { CustomLevel as _CustomLevel } from "./declarations/backend.did.d.ts";
+import type { CustomLevel as _CustomLevel, UserStats as _UserStats } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
     constructor(private actor: ActorSubclass<_SERVICE>, private _uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, private _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, private processError?: (error: unknown) => never){}
+    async adminResetUsernames(): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.adminResetUsernames();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.adminResetUsernames();
+            return result;
+        }
+    }
+    async claimOwnerPrincipal(arg0: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.claimOwnerPrincipal(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.claimOwnerPrincipal(arg0);
+            return result;
+        }
+    }
     async deleteLevel(arg0: bigint): Promise<void> {
         if (this.processError) {
             try {
@@ -222,32 +257,32 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async getMyStats(): Promise<UserStats> {
+    async getMyStats(): Promise<UserStats | null> {
         if (this.processError) {
             try {
                 const result = await this.actor.getMyStats();
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.getMyStats();
-            return result;
-        }
-    }
-    async getMyUsername(): Promise<string | null> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.getMyUsername();
                 return from_candid_opt_n2(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.getMyUsername();
+            const result = await this.actor.getMyStats();
             return from_candid_opt_n2(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getMyUsername(): Promise<string | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getMyUsername();
+                return from_candid_opt_n3(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getMyUsername();
+            return from_candid_opt_n3(this._uploadFile, this._downloadFile, result);
         }
     }
     async getPublicLevels(): Promise<Array<CustomLevel>> {
@@ -282,14 +317,14 @@ export class Backend implements backendInterface {
         if (this.processError) {
             try {
                 const result = await this.actor.getUsernameForPrincipal(arg0);
-                return from_candid_opt_n2(this._uploadFile, this._downloadFile, result);
+                return from_candid_opt_n3(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getUsernameForPrincipal(arg0);
-            return from_candid_opt_n2(this._uploadFile, this._downloadFile, result);
+            return from_candid_opt_n3(this._uploadFile, this._downloadFile, result);
         }
     }
     async registerUsername(arg0: string): Promise<void> {
@@ -303,6 +338,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.registerUsername(arg0);
+            return result;
+        }
+    }
+    async resetMyUsername(): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.resetMyUsername();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.resetMyUsername();
             return result;
         }
     }
@@ -338,7 +387,10 @@ export class Backend implements backendInterface {
 function from_candid_opt_n1(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_CustomLevel]): CustomLevel | null {
     return value.length === 0 ? null : value[0];
 }
-function from_candid_opt_n2(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [string]): string | null {
+function from_candid_opt_n2(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_UserStats]): UserStats | null {
+    return value.length === 0 ? null : value[0];
+}
+function from_candid_opt_n3(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [string]): string | null {
     return value.length === 0 ? null : value[0];
 }
 export interface CreateActorOptions {
