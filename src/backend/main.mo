@@ -1,15 +1,18 @@
 import Map "mo:core/Map";
 import Array "mo:core/Array";
-import Principal "mo:core/Principal";
 import Iter "mo:core/Iter";
+import Principal "mo:core/Principal";
 import Order "mo:core/Order";
 import Runtime "mo:core/Runtime";
-import Time "mo:core/Time";
 import Text "mo:core/Text";
 import Nat "mo:core/Nat";
 import Int "mo:core/Int";
 import Char "mo:core/Char";
+import Migration "migration";
+import Time "mo:core/Time";
 
+// Apply migration on upgrade using the with-clause
+(with migration = Migration.run)
 actor {
   type UserStats = {
     bestStage : Nat;
@@ -40,6 +43,7 @@ actor {
     worldWidth : Nat;
     bgHue : Nat;
     author : Principal;
+    authorSession : Text;
     createdAt : Int;
   };
 
@@ -49,18 +53,19 @@ actor {
     };
   };
 
-  var nextLevelId = 0;
   let customLevelsById = Map.empty<Nat, CustomLevel>();
+  var nextLevelId = 0;
 
-  // Username system
-  let usernames = Map.empty<Text, Principal>();
-  let principalToUsername = Map.empty<Principal, Text>();
+  // Username system using session IDs
+  let sessionToUsername = Map.empty<Text, Text>();
+  let usernameToSession = Map.empty<Text, Text>();
+  let principalToSession = Map.empty<Principal, Text>();
 
-  // New persistent owner principal
+  // Persistent owner principal
   var ownerPrincipal = "";
 
-  // Username registration
-  public shared ({ caller }) func registerUsername(name : Text) : async () {
+  // Username registration with session ID
+  public shared ({ caller }) func registerUsername(sessionId : Text, name : Text) : async () {
     let trimmed = name.trimStart(#char(' ')).trimEnd(#char(' '));
     let len = trimmed.size();
 
@@ -85,56 +90,61 @@ actor {
       Runtime.trap("Username can only contain letters, numbers, underscores");
     };
 
-    if (trimmed == "tung_master") {
-      Runtime.trap("Username `tung_master` is reserved and cannot be registered");
-    };
-
-    switch (principalToUsername.get(caller)) {
+    switch (sessionToUsername.get(sessionId)) {
       case (?_) {
-        Runtime.trap("You have already registered a username");
+        Runtime.trap("Session already registered a username");
       };
       case (null) {};
     };
 
-    switch (usernames.get(trimmed)) {
+    switch (usernameToSession.get(trimmed)) {
       case (?_) {
         Runtime.trap("Username already taken");
       };
       case (null) {};
     };
 
-    usernames.add(trimmed, caller);
-    principalToUsername.add(caller, trimmed);
+    sessionToUsername.add(sessionId, trimmed);
+    usernameToSession.add(trimmed, sessionId);
+    principalToSession.add(caller, sessionId); // Add the principal→session mapping
   };
 
-  // Fix the getMyUsername function to simply return the caller's entry
-  public query ({ caller }) func getMyUsername() : async ?Text {
-    principalToUsername.get(caller);
+  public query ({ caller }) func getMyUsername(sessionId : Text) : async ?Text {
+    sessionToUsername.get(sessionId);
   };
 
-  /// Allow users to reset/delete their own username
-  /// This removes entries from both maps, allowing the user to re-register a new name
-  public shared ({ caller }) func resetMyUsername() : async () {
-    switch (principalToUsername.get(caller)) {
+  public query ({ caller }) func getAllUsernames() : async [(Text, Text)] {
+    sessionToUsername.entries().toArray();
+  };
+
+  public shared ({ caller }) func adminResetUsernames(secret : Text) : async () {
+    if (secret != "tungmaster2024owner") {
+      Runtime.trap("Unauthorized");
+    };
+
+    sessionToUsername.clear();
+    usernameToSession.clear();
+    principalToSession.clear();
+  };
+
+  public shared ({ caller }) func resetMyUsername(sessionId : Text) : async () {
+    switch (sessionToUsername.get(sessionId)) {
       case (null) {
-        Runtime.trap("No username found for the current user");
+        Runtime.trap("No username found for this session");
       };
       case (?username) {
-        principalToUsername.remove(caller);
-        usernames.remove(username);
+        sessionToUsername.remove(sessionId);
+        usernameToSession.remove(username);
+
+        // Remove associated principal entry
+        let entries = principalToSession.entries().toArray();
+        for ((principal, _sessionId) in entries.values()) {
+          if (_sessionId == sessionId) {
+            principalToSession.remove(principal);
+          };
+        };
       };
     };
-  };
-
-  // Get username for a given principal
-  public query ({ caller }) func getUsernameForPrincipal(p : Principal) : async ?Text {
-    principalToUsername.get(p);
-  };
-
-  // Get all usernames with principals
-  public query ({ caller }) func getAllUsernames() : async [(Principal, Text)] {
-    let entriesArray = principalToUsername.entries().toArray();
-    entriesArray;
   };
 
   // Save or update a player's game stats
@@ -205,8 +215,62 @@ actor {
     sortedStats.sliceToArray(0, entriesToTake);
   };
 
+  // Get leaderboard with usernames appended
+  public query ({ caller }) func getLeaderboardWithUsernames() : async [(Principal, UserStats, Text)] {
+    let statsArray = stats.entries().toArray();
+    let sortedStats = statsArray.sort(UserStats.compareByBestStageThenDeaths);
+    let entriesToTake = if (sortedStats.size() < 100) { sortedStats.size() } else { 100 };
+    let leaderboard = sortedStats.sliceToArray(0, entriesToTake);
+
+    // Map to include username
+    leaderboard.map<(Principal, UserStats), (Principal, UserStats, Text)>(
+      func((principal, stats)) {
+        let maybeSessionId = principalToSession.get(principal);
+        switch (maybeSessionId) {
+          case (null) { (principal, stats, "") };
+          case (?sessionId) {
+            let maybeUsername = sessionToUsername.get(sessionId);
+            switch (maybeUsername) {
+              case (null) { (principal, stats, "") };
+              case (?username) { (principal, stats, username) };
+            };
+          };
+        };
+      }
+    );
+  };
+
+  // Get speed leaderboard with usernames appended
+  public query ({ caller }) func getSpeedLeaderboardWithUsernames() : async [(Principal, UserStats, Text)] {
+    let filteredStats = stats.entries().toArray().filter(
+      func(entry) {
+        entry.1.bestCompletionTimeMs > 0;
+      }
+    );
+    let sortedStats = filteredStats.sort(UserStats.compareByCompletionTime);
+    let entriesToTake = if (sortedStats.size() < 100) { sortedStats.size() } else { 100 };
+    let speedLeaderboard = sortedStats.sliceToArray(0, entriesToTake);
+
+    // Map to include username
+    speedLeaderboard.map<(Principal, UserStats), (Principal, UserStats, Text)>(
+      func((principal, stats)) {
+        let maybeSessionId = principalToSession.get(principal);
+        switch (maybeSessionId) {
+          case (null) { (principal, stats, "") };
+          case (?sessionId) {
+            let maybeUsername = sessionToUsername.get(sessionId);
+            switch (maybeUsername) {
+              case (null) { (principal, stats, "") };
+              case (?username) { (principal, stats, username) };
+            };
+          };
+        };
+      }
+    );
+  };
+
   // Save new custom level
-  public shared ({ caller }) func saveCustomLevel(name : Text, platformsJson : Text, worldWidth : Nat, bgHue : Nat) : async () {
+  public shared ({ caller }) func saveCustomLevel(sessionId : Text, name : Text, platformsJson : Text, worldWidth : Nat, bgHue : Nat) : async () {
     let trimmedName = name.trimStart(#char(' ')).trimEnd(#char(' '));
     let nameLen = trimmedName.size();
 
@@ -224,7 +288,7 @@ actor {
     };
 
     let existingLevelsCount = customLevelsById.values().toArray().filter(
-      func(level) { level.author == caller }
+      func(level) { level.authorSession == sessionId }
     ).size();
 
     if (existingLevelsCount >= 2) {
@@ -238,6 +302,7 @@ actor {
       worldWidth;
       bgHue;
       author = caller;
+      authorSession = sessionId;
       createdAt = Time.now();
     };
 
@@ -245,12 +310,12 @@ actor {
     nextLevelId += 1;
   };
 
-  public query ({ caller }) func getMyLevel() : async ?CustomLevel {
+  public query ({ caller }) func getMyLevel(sessionId : Text) : async ?CustomLevel {
     var mostRecentLevel : ?CustomLevel = null;
     var latestTime : Int = 0;
 
     for ((_, level) in customLevelsById.entries()) {
-      if (level.author == caller and level.createdAt > latestTime) {
+      if (level.authorSession == sessionId and level.createdAt > latestTime) {
         mostRecentLevel := ?level;
         latestTime := level.createdAt;
       };
@@ -259,10 +324,10 @@ actor {
     mostRecentLevel;
   };
 
-  public query ({ caller }) func getMyLevels() : async [CustomLevel] {
+  public query ({ caller }) func getMyLevels(sessionId : Text) : async [CustomLevel] {
     let allLevels = customLevelsById.values().toArray();
     let filteredLevels = allLevels.filter(
-      func(level) { level.author == caller }
+      func(level) { level.authorSession == sessionId }
     );
     filteredLevels.sort(CustomLevel.compareByCreatedAt);
   };
@@ -274,12 +339,12 @@ actor {
     sortedLevels.sliceToArray(0, levelsToTake);
   };
 
-  public shared ({ caller }) func deleteMyLevel() : async () {
+  public shared ({ caller }) func deleteMyLevel(sessionId : Text) : async () {
     var mostRecentLevelId : ?Nat = null;
     var latestTime : Int = 0;
 
     for ((id, level) in customLevelsById.entries()) {
-      if (level.author == caller and level.createdAt > latestTime) {
+      if (level.authorSession == sessionId and level.createdAt > latestTime) {
         mostRecentLevelId := ?id;
         latestTime := level.createdAt;
       };
@@ -299,11 +364,11 @@ actor {
     customLevelsById.get(id);
   };
 
-  public shared ({ caller }) func deleteLevel(id : Nat) : async () {
+  public shared ({ caller }) func deleteLevel(sessionId : Text, id : Nat) : async () {
     switch (customLevelsById.get(id)) {
       case (null) { Runtime.trap("Level with id " # id.toText() # " not found") };
       case (?level) {
-        if (level.author != caller) {
+        if (level.authorSession != sessionId) {
           Runtime.trap("Only the author can delete this level");
         };
 
@@ -312,7 +377,7 @@ actor {
     };
   };
 
-  // New function to claim owner principal
+  // Function to claim owner principal
   public shared ({ caller }) func claimOwnerPrincipal(secret : Text) : async Bool {
     if (secret == "tungmaster2024owner" and ownerPrincipal == "") {
       ownerPrincipal := caller.toText();
@@ -322,15 +387,5 @@ actor {
     } else {
       false;
     };
-  };
-
-  // New admin function to reset all usernames (admin only)
-  public shared ({ caller }) func adminResetUsernames() : async () {
-    if (caller.toText() != ownerPrincipal or ownerPrincipal == "") {
-      Runtime.trap("Unauthorized");
-    };
-
-    usernames.clear();
-    principalToUsername.clear();
   };
 };

@@ -9,6 +9,24 @@ import type { Platform, StageConfig } from "./components/ObbyCoreGame";
 import { useActor } from "./hooks/useActor";
 
 // ===================================================
+// SESSION ID — stable device-local identity
+// ===================================================
+
+function getOrCreateSessionId(): string {
+  const KEY = "tung_obby_session_id";
+  let id = localStorage.getItem(KEY);
+  if (!id) {
+    const arr = new Uint8Array(8);
+    crypto.getRandomValues(arr);
+    id = Array.from(arr)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+    localStorage.setItem(KEY, id);
+  }
+  return id;
+}
+
+// ===================================================
 // OWNER TAG
 // ===================================================
 
@@ -45,10 +63,6 @@ function UsernameModal({ onConfirm }: UsernameModalProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = value.trim();
-    if (trimmed.toLowerCase() === "tung_master") {
-      setError("That username is reserved.");
-      return;
-    }
     const validationError = validateUsername(trimmed);
     if (validationError) {
       setError(validationError);
@@ -804,6 +818,7 @@ function TouchControls({ onJump }: { onJump: () => void }) {
 
 export default function App() {
   const { actor } = useActor();
+  const sessionIdRef = useRef<string>(getOrCreateSessionId());
   const [screen, setScreen] = useState<GameScreen>("start");
   const [stage, setStage] = useState(1);
   const [lives, setLives] = useState(3);
@@ -853,19 +868,23 @@ export default function App() {
     if (!actor) return;
     setIsLeaderboardLoading(true);
     try {
-      const [lb, speedLb, stats, allUsernames] = await Promise.all([
-        actor.getLeaderboard(),
-        actor.getSpeedLeaderboard(),
+      const [lb, speedLb, stats] = await Promise.all([
+        actor.getLeaderboardWithUsernames(),
+        actor.getSpeedLeaderboardWithUsernames(),
         actor.getMyStats(),
-        actor.getAllUsernames(),
       ]);
 
-      // Build username map from principal string -> username
-      const uMap = new Map<string, string>();
-      for (const [principal, uname] of allUsernames) {
-        uMap.set(principal.toString(), uname);
+      // Build usernameMap keyed by principal string from the returned tuples
+      const newUsernameMap = new Map<string, string>();
+      for (const [principal, , uname] of lb) {
+        if (uname) newUsernameMap.set(principal.toString(), uname);
       }
-      setUsernameMap(uMap);
+      for (const [principal, , uname] of speedLb) {
+        if (uname && !newUsernameMap.has(principal.toString())) {
+          newUsernameMap.set(principal.toString(), uname);
+        }
+      }
+      setUsernameMap(newUsernameMap);
 
       const entries: LeaderboardEntry[] = lb
         .map(([principal, userStats]) => ({
@@ -911,7 +930,7 @@ export default function App() {
   const loadUserLevel = useCallback(async () => {
     if (!actor) return;
     try {
-      const myLevel = await actor.getMyLevel();
+      const myLevel = await actor.getMyLevel(sessionIdRef.current);
       if (myLevel) {
         setUserExistingLevel({
           name: myLevel.name,
@@ -932,23 +951,21 @@ export default function App() {
     }
   }, [actor, loadLeaderboard, loadUserLevel]);
 
-  // On actor ready, check username status
-  // Always fetch from backend — never use localStorage, which is shared on the
-  // same device and would cause different users to see a previous player's name.
+  // On actor ready, check username status using stable session ID
   useEffect(() => {
     if (!actor) return;
     const checkUsername = async () => {
       try {
-        const backendName = await actor.getMyUsername();
+        const sessionId = sessionIdRef.current;
+        const backendName = await actor.getMyUsername(sessionId);
         if (backendName) {
-          // Confirmed from backend for this principal
           setUsername(backendName);
           setShowUsernameModal(false);
           if (backendName === "tung_master") {
             actor.claimOwnerPrincipal("tungmaster2024owner").catch(() => {});
           }
         } else {
-          // No name in backend for this principal — prompt to register
+          // No name for this session — prompt to register
           setUsername(null);
           setShowUsernameModal(true);
         }
@@ -963,8 +980,9 @@ export default function App() {
   const handleConfirmUsername = useCallback(
     async (name: string) => {
       if (!actor) throw new Error("Not connected");
+      const sessionId = sessionIdRef.current;
       try {
-        await actor.registerUsername(name);
+        await actor.registerUsername(sessionId, name);
         setUsername(name);
         setShowUsernameModal(false);
       } catch (err: unknown) {
@@ -976,7 +994,7 @@ export default function App() {
         ) {
           // Try to retrieve their existing name from the backend
           try {
-            const existing = await actor.getMyUsername();
+            const existing = await actor.getMyUsername(sessionId);
             if (existing) {
               setUsername(existing);
               setShowUsernameModal(false);
@@ -1095,7 +1113,7 @@ export default function App() {
     )
       return;
     try {
-      await actor.adminResetUsernames();
+      await actor.adminResetUsernames("tungmaster2024owner");
       // Clear own username state so owner is also re-prompted
       setUsername(null);
       setShowUsernameModal(true);
@@ -1141,6 +1159,7 @@ export default function App() {
     async (stage: StageConfig) => {
       if (!actor) throw new Error("Not connected");
       await actor.saveCustomLevel(
+        sessionIdRef.current,
         stage.name,
         JSON.stringify(stage.platforms),
         BigInt(stage.worldWidth),
@@ -1227,6 +1246,7 @@ export default function App() {
           onBack={() => setScreen("start")}
           onPlayLevel={handlePlayCommunityLevel}
           usernameMap={usernameMap}
+          sessionId={sessionIdRef.current}
         />
       )}
 

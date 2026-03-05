@@ -15,6 +15,7 @@ export interface CustomLevel {
   'worldWidth' : bigint,
   'name' : string,
   'createdAt' : bigint,
+  'authorSession' : string,
   'author' : Principal,
   'platformsJson' : string,
   'bgHue' : bigint,
@@ -26,27 +27,33 @@ export interface UserStats {
   'bestStage' : bigint,
 }
 export interface _SERVICE {
-  'adminResetUsernames' : ActorMethod<[], undefined>,
+  'adminResetUsernames' : ActorMethod<[string], undefined>,
   'claimOwnerPrincipal' : ActorMethod<[string], boolean>,
-  'deleteLevel' : ActorMethod<[bigint], undefined>,
-  'deleteMyLevel' : ActorMethod<[], undefined>,
-  'getAllUsernames' : ActorMethod<[], Array<[Principal, string]>>,
+  'deleteLevel' : ActorMethod<[string, bigint], undefined>,
+  'deleteMyLevel' : ActorMethod<[string], undefined>,
+  'getAllUsernames' : ActorMethod<[], Array<[string, string]>>,
   'getLeaderboard' : ActorMethod<[], Array<[Principal, UserStats]>>,
+  'getLeaderboardWithUsernames' : ActorMethod<
+    [],
+    Array<[Principal, UserStats, string]>
+  >,
   'getLevelById' : ActorMethod<[bigint], [] | [CustomLevel]>,
-  'getMyLevel' : ActorMethod<[], [] | [CustomLevel]>,
-  'getMyLevels' : ActorMethod<[], Array<CustomLevel>>,
+  'getMyLevel' : ActorMethod<[string], [] | [CustomLevel]>,
+  'getMyLevels' : ActorMethod<[string], Array<CustomLevel>>,
   'getMyStats' : ActorMethod<[], [] | [UserStats]>,
-  'getMyUsername' : ActorMethod<[], [] | [string]>,
+  'getMyUsername' : ActorMethod<[string], [] | [string]>,
   'getPublicLevels' : ActorMethod<[], Array<CustomLevel>>,
   'getSpeedLeaderboard' : ActorMethod<[], Array<[Principal, UserStats]>>,
-  'getUsernameForPrincipal' : ActorMethod<[Principal], [] | [string]>,
-  'registerUsername' : ActorMethod<[string], undefined>,
-  /**
-   * / Allow users to reset/delete their own username
-   * / This removes entries from both maps, allowing the user to re-register a new name
-   */
-  'resetMyUsername' : ActorMethod<[], undefined>,
-  'saveCustomLevel' : ActorMethod<[string, string, bigint, bigint], undefined>,
+  'getSpeedLeaderboardWithUsernames' : ActorMethod<
+    [],
+    Array<[Principal, UserStats, string]>
+  >,
+  'registerUsername' : ActorMethod<[string, string], undefined>,
+  'resetMyUsername' : ActorMethod<[string], undefined>,
+  'saveCustomLevel' : ActorMethod<
+    [string, string, string, bigint, bigint],
+    undefined
+  >,
   'saveGameResult' : ActorMethod<[bigint, bigint, bigint], undefined>,
 }
 export declare const idlService: IDL.ServiceClass;

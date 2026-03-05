@@ -18,31 +18,29 @@ export interface CustomLevel {
     worldWidth: bigint;
     name: string;
     createdAt: bigint;
+    authorSession: string;
     author: Principal;
     platformsJson: string;
     bgHue: bigint;
 }
 export interface backendInterface {
-    adminResetUsernames(): Promise<void>;
+    adminResetUsernames(secret: string): Promise<void>;
     claimOwnerPrincipal(secret: string): Promise<boolean>;
-    deleteLevel(id: bigint): Promise<void>;
-    deleteMyLevel(): Promise<void>;
-    getAllUsernames(): Promise<Array<[Principal, string]>>;
+    deleteLevel(sessionId: string, id: bigint): Promise<void>;
+    deleteMyLevel(sessionId: string): Promise<void>;
+    getAllUsernames(): Promise<Array<[string, string]>>;
     getLeaderboard(): Promise<Array<[Principal, UserStats]>>;
+    getLeaderboardWithUsernames(): Promise<Array<[Principal, UserStats, string]>>;
     getLevelById(id: bigint): Promise<CustomLevel | null>;
-    getMyLevel(): Promise<CustomLevel | null>;
-    getMyLevels(): Promise<Array<CustomLevel>>;
+    getMyLevel(sessionId: string): Promise<CustomLevel | null>;
+    getMyLevels(sessionId: string): Promise<Array<CustomLevel>>;
     getMyStats(): Promise<UserStats | null>;
-    getMyUsername(): Promise<string | null>;
+    getMyUsername(sessionId: string): Promise<string | null>;
     getPublicLevels(): Promise<Array<CustomLevel>>;
     getSpeedLeaderboard(): Promise<Array<[Principal, UserStats]>>;
-    getUsernameForPrincipal(p: Principal): Promise<string | null>;
-    registerUsername(name: string): Promise<void>;
-    /**
-     * / Allow users to reset/delete their own username
-     * / This removes entries from both maps, allowing the user to re-register a new name
-     */
-    resetMyUsername(): Promise<void>;
-    saveCustomLevel(name: string, platformsJson: string, worldWidth: bigint, bgHue: bigint): Promise<void>;
+    getSpeedLeaderboardWithUsernames(): Promise<Array<[Principal, UserStats, string]>>;
+    registerUsername(sessionId: string, name: string): Promise<void>;
+    resetMyUsername(sessionId: string): Promise<void>;
+    saveCustomLevel(sessionId: string, name: string, platformsJson: string, worldWidth: bigint, bgHue: bigint): Promise<void>;
     saveGameResult(stageReached: bigint, deathsThisRun: bigint, completionTimeMs: bigint): Promise<void>;
 }

@@ -32,6 +32,7 @@ interface CommunityLevelsProps {
     bgHue: number;
   }) => void;
   usernameMap?: Map<string, string>;
+  sessionId: string;
 }
 
 // ===================================================
@@ -42,6 +43,7 @@ export default function CommunityLevels({
   onBack,
   onPlayLevel,
   usernameMap,
+  sessionId,
 }: CommunityLevelsProps) {
   const { actor } = useActor();
   const [levels, setLevels] = useState<CommunityLevelItem[]>([]);
@@ -71,7 +73,7 @@ export default function CommunityLevels({
     if (!actor) return;
     setIsMyLevelsLoading(true);
     try {
-      const rawMyLevels = await actor.getMyLevels();
+      const rawMyLevels = await actor.getMyLevels(sessionId);
       const parsed: MyLevelItem[] = rawMyLevels.map((lvl) => ({
         id: lvl.id,
         name: lvl.name || "Unnamed Level",
@@ -90,7 +92,7 @@ export default function CommunityLevels({
     } finally {
       setIsMyLevelsLoading(false);
     }
-  }, [actor]);
+  }, [actor, sessionId]);
 
   const loadPublicLevels = useCallback(async () => {
     if (!actor) return;
@@ -126,7 +128,7 @@ export default function CommunityLevels({
       if (!actor) return;
       setDeletingId(id);
       try {
-        await actor.deleteLevel(id);
+        await actor.deleteLevel(sessionId, id);
         // Refresh both lists after deletion
         await Promise.all([loadMyLevels(), loadPublicLevels()]);
       } catch {
@@ -135,7 +137,7 @@ export default function CommunityLevels({
         setDeletingId(null);
       }
     },
-    [actor, loadMyLevels, loadPublicLevels],
+    [actor, sessionId, loadMyLevels, loadPublicLevels],
   );
 
   const slotsUsed = myLevels.length;
@@ -606,17 +608,50 @@ export default function CommunityLevels({
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div
                     style={{
-                      fontSize: 14,
-                      fontWeight: 800,
-                      color: "#e0d0ff",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.04em",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
                       overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
                     }}
                   >
-                    {level.name}
+                    <div
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 800,
+                        color: "#e0d0ff",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.04em",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        flex: "0 1 auto",
+                        minWidth: 0,
+                      }}
+                    >
+                      {level.name}
+                    </div>
+                    {isOwner(level.author) && (
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 2,
+                          padding: "1px 5px",
+                          background: "rgba(34,197,94,0.1)",
+                          border: "1px solid rgba(34,197,94,0.3)",
+                          borderRadius: 4,
+                          fontSize: 9,
+                          fontWeight: 700,
+                          color: "#22c55e",
+                          letterSpacing: "0.05em",
+                          textTransform: "uppercase",
+                          whiteSpace: "nowrap",
+                          flexShrink: 0,
+                        }}
+                      >
+                        🔒 Protected
+                      </span>
+                    )}
                   </div>
                   <div
                     style={{
