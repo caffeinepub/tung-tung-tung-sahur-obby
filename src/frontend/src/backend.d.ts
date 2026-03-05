@@ -29,6 +29,7 @@ export interface backendInterface {
     getLeaderboard(): Promise<Array<[Principal, UserStats]>>;
     getLevelById(id: bigint): Promise<CustomLevel | null>;
     getMyLevel(): Promise<CustomLevel | null>;
+    getMyLevels(): Promise<Array<CustomLevel>>;
     getMyStats(): Promise<UserStats>;
     getMyUsername(): Promise<string | null>;
     getPublicLevels(): Promise<Array<CustomLevel>>;

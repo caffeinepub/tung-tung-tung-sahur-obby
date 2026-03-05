@@ -111,6 +111,7 @@ export interface backendInterface {
     getLeaderboard(): Promise<Array<[Principal, UserStats]>>;
     getLevelById(id: bigint): Promise<CustomLevel | null>;
     getMyLevel(): Promise<CustomLevel | null>;
+    getMyLevels(): Promise<Array<CustomLevel>>;
     getMyStats(): Promise<UserStats>;
     getMyUsername(): Promise<string | null>;
     getPublicLevels(): Promise<Array<CustomLevel>>;
@@ -205,6 +206,20 @@ export class Backend implements backendInterface {
         } else {
             const result = await this.actor.getMyLevel();
             return from_candid_opt_n1(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getMyLevels(): Promise<Array<CustomLevel>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getMyLevels();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getMyLevels();
+            return result;
         }
     }
     async getMyStats(): Promise<UserStats> {

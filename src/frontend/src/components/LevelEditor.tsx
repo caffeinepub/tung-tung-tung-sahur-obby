@@ -33,6 +33,15 @@ type PlatformType =
   | "checkpoint"
   | "finish";
 
+type EditorSlot = 1 | 2;
+
+interface SlotData {
+  name: string;
+  platformsJson: string;
+  worldWidth: number;
+  bgHue: number;
+}
+
 const PLATFORM_COLORS: Record<PlatformType, string> = {
   static: "#a855f7",
   moving: "#22d3ee",
@@ -64,6 +73,37 @@ const GRID = 40;
 const DEFAULT_WORLD_WIDTH = 3200;
 const SPAWN_X = 60;
 const SPAWN_Y = 440;
+const DEFAULT_BG_HUE = 260;
+const DEFAULT_LEVEL_NAME = "My Level";
+
+// ===================================================
+// SLOT STORAGE HELPERS
+// ===================================================
+
+function getSlotKey(slot: EditorSlot, field: string): string {
+  return `levelEditor_slot${slot}_${field}`;
+}
+
+function loadSlotData(slot: EditorSlot): SlotData {
+  const name =
+    localStorage.getItem(getSlotKey(slot, "name")) ?? DEFAULT_LEVEL_NAME;
+  const platformsJson =
+    localStorage.getItem(getSlotKey(slot, "platforms")) ?? "[]";
+  const worldWidth = Number(
+    localStorage.getItem(getSlotKey(slot, "worldWidth")) ?? DEFAULT_WORLD_WIDTH,
+  );
+  const bgHue = Number(
+    localStorage.getItem(getSlotKey(slot, "bgHue")) ?? DEFAULT_BG_HUE,
+  );
+  return { name, platformsJson, worldWidth, bgHue };
+}
+
+function saveSlotData(slot: EditorSlot, data: SlotData) {
+  localStorage.setItem(getSlotKey(slot, "name"), data.name);
+  localStorage.setItem(getSlotKey(slot, "platforms"), data.platformsJson);
+  localStorage.setItem(getSlotKey(slot, "worldWidth"), String(data.worldWidth));
+  localStorage.setItem(getSlotKey(slot, "bgHue"), String(data.bgHue));
+}
 
 // ===================================================
 // HELPERS
@@ -320,22 +360,55 @@ export default function LevelEditor({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animRef = useRef<number>(0);
 
+  // Active slot state
+  const [activeSlot, setActiveSlot] = useState<EditorSlot>(() => {
+    const saved = localStorage.getItem("levelEditor_activeSlot");
+    return saved === "2" ? 2 : 1;
+  });
+
+  // Load initial slot data — prefer existingLevel for slot 1 on first load
   const [platforms, setPlatforms] = useState<Platform[]>(() => {
-    if (existingLevel) {
+    const slot1HasData = localStorage.getItem("levelEditor_slot1_platforms");
+    if (!slot1HasData && existingLevel) {
+      // Migrate existingLevel into slot 1
       try {
         return JSON.parse(existingLevel.platformsJson) as Platform[];
       } catch {
         return [];
       }
     }
-    return [];
+    const slotData = loadSlotData(1);
+    try {
+      return JSON.parse(slotData.platformsJson) as Platform[];
+    } catch {
+      return [];
+    }
   });
 
-  const [levelName, setLevelName] = useState(existingLevel?.name ?? "My Level");
-  const [worldWidth, setWorldWidth] = useState(
-    existingLevel?.worldWidth ?? DEFAULT_WORLD_WIDTH,
-  );
-  const [bgHue, setBgHue] = useState(existingLevel?.bgHue ?? 260);
+  const [levelName, setLevelName] = useState<string>(() => {
+    const slot1HasData = localStorage.getItem("levelEditor_slot1_platforms");
+    if (!slot1HasData && existingLevel) {
+      return existingLevel.name;
+    }
+    return loadSlotData(1).name;
+  });
+
+  const [worldWidth, setWorldWidth] = useState<number>(() => {
+    const slot1HasData = localStorage.getItem("levelEditor_slot1_platforms");
+    if (!slot1HasData && existingLevel) {
+      return existingLevel.worldWidth;
+    }
+    return loadSlotData(1).worldWidth;
+  });
+
+  const [bgHue, setBgHue] = useState<number>(() => {
+    const slot1HasData = localStorage.getItem("levelEditor_slot1_platforms");
+    if (!slot1HasData && existingLevel) {
+      return existingLevel.bgHue;
+    }
+    return loadSlotData(1).bgHue;
+  });
+
   const [selectedType, setSelectedType] = useState<PlatformType>("static");
   const [isPublishing, setIsPublishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -372,6 +445,56 @@ export default function LevelEditor({
   useEffect(() => {
     bgHueRef.current = bgHue;
   }, [bgHue]);
+
+  // Auto-save current slot to localStorage whenever data changes
+  useEffect(() => {
+    saveSlotData(activeSlot, {
+      name: levelName,
+      platformsJson: JSON.stringify(platforms),
+      worldWidth,
+      bgHue,
+    });
+  }, [activeSlot, levelName, platforms, worldWidth, bgHue]);
+
+  // ===================================================
+  // SLOT SWITCHING
+  // ===================================================
+
+  const switchSlot = useCallback(
+    (newSlot: EditorSlot) => {
+      if (newSlot === activeSlot) return;
+
+      // Save current slot state first
+      saveSlotData(activeSlot, {
+        name: levelName,
+        platformsJson: JSON.stringify(platformsRef.current),
+        worldWidth: worldWidthRef.current,
+        bgHue: bgHueRef.current,
+      });
+
+      // Load new slot data
+      const newData = loadSlotData(newSlot);
+      let newPlatforms: Platform[] = [];
+      try {
+        newPlatforms = JSON.parse(newData.platformsJson) as Platform[];
+      } catch {
+        newPlatforms = [];
+      }
+
+      setActiveSlot(newSlot);
+      localStorage.setItem("levelEditor_activeSlot", String(newSlot));
+      setPlatforms(newPlatforms);
+      setLevelName(newData.name);
+      setWorldWidth(newData.worldWidth);
+      setBgHue(newData.bgHue);
+
+      // Reset camera and editor state
+      cameraXRef.current = 0;
+      setError(null);
+      setPublishSuccess(false);
+    },
+    [activeSlot, levelName],
+  );
 
   const buildStage = useCallback(
     (): StageConfig => ({
@@ -620,8 +743,18 @@ export default function LevelEditor({
       await onPublish(buildStage());
       setPublishSuccess(true);
       setTimeout(() => setPublishSuccess(false), 3000);
-    } catch {
-      setError("Failed to publish. Try again.");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (
+        msg.toLowerCase().includes("2 published") ||
+        msg.toLowerCase().includes("already have 2")
+      ) {
+        setError(
+          "You already have 2 published levels. Go to Community Levels → My Published Levels and delete one before publishing again.",
+        );
+      } else {
+        setError("Failed to publish. Try again.");
+      }
     } finally {
       setIsPublishing(false);
     }
@@ -634,6 +767,26 @@ export default function LevelEditor({
   const platformCount = platforms.length;
   const hasFinish = platforms.some((p) => p.type === "finish");
   const hasCheckpoint = platforms.some((p) => p.type === "checkpoint");
+
+  // Slot button style helper
+  const slotBtnStyle = (slot: EditorSlot): React.CSSProperties => ({
+    flex: 1,
+    padding: "7px 0",
+    background:
+      activeSlot === slot
+        ? "linear-gradient(135deg, #a855f7, #e879f9)"
+        : "rgba(168,85,247,0.07)",
+    border: `1px solid ${activeSlot === slot ? "#a855f7" : "rgba(168,85,247,0.2)"}`,
+    borderRadius: 6,
+    color: activeSlot === slot ? "#05030f" : "rgba(200,180,255,0.55)",
+    fontSize: 12,
+    fontWeight: 800,
+    cursor: "pointer",
+    letterSpacing: "0.06em",
+    transition: "all 0.15s",
+    textTransform: "uppercase" as const,
+    boxShadow: activeSlot === slot ? "0 0 12px rgba(168,85,247,0.4)" : "none",
+  });
 
   return (
     <div
@@ -701,6 +854,55 @@ export default function LevelEditor({
           >
             ← Back
           </button>
+        </div>
+
+        {/* Slot Toggle */}
+        <div
+          style={{
+            padding: "12px 16px 10px",
+            borderBottom: "1px solid rgba(168,85,247,0.1)",
+          }}
+        >
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              color: "rgba(168,85,247,0.5)",
+              marginBottom: 8,
+            }}
+          >
+            Save Slot
+          </div>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button
+              type="button"
+              onClick={() => switchSlot(1)}
+              data-ocid="editor.slot1_button"
+              style={slotBtnStyle(1)}
+            >
+              Slot 1
+            </button>
+            <button
+              type="button"
+              onClick={() => switchSlot(2)}
+              data-ocid="editor.slot2_button"
+              style={slotBtnStyle(2)}
+            >
+              Slot 2
+            </button>
+          </div>
+          <div
+            style={{
+              fontSize: 9,
+              color: "rgba(200,180,255,0.3)",
+              marginTop: 5,
+              textAlign: "center",
+            }}
+          >
+            Each slot saves independently
+          </div>
         </div>
 
         {/* Level Settings */}
@@ -994,6 +1196,7 @@ export default function LevelEditor({
               borderRadius: 6,
               color: "#f87171",
               fontSize: 11,
+              lineHeight: 1.5,
             }}
           >
             {error}
@@ -1012,7 +1215,7 @@ export default function LevelEditor({
               fontSize: 11,
             }}
           >
-            ✓ Published!
+            ✓ Published! (Slot {activeSlot})
           </div>
         )}
 
@@ -1076,7 +1279,7 @@ export default function LevelEditor({
               transition: "all 0.1s",
             }}
           >
-            {isPublishing ? "Publishing..." : "⬆ Save & Publish"}
+            {isPublishing ? "Publishing..." : `⬆ Publish (Slot ${activeSlot})`}
           </button>
           <button
             type="button"

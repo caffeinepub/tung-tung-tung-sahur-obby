@@ -32,6 +32,7 @@ export interface _SERVICE {
   'getLeaderboard' : ActorMethod<[], Array<[Principal, UserStats]>>,
   'getLevelById' : ActorMethod<[bigint], [] | [CustomLevel]>,
   'getMyLevel' : ActorMethod<[], [] | [CustomLevel]>,
+  'getMyLevels' : ActorMethod<[], Array<CustomLevel>>,
   'getMyStats' : ActorMethod<[], UserStats>,
   'getMyUsername' : ActorMethod<[], [] | [string]>,
   'getPublicLevels' : ActorMethod<[], Array<CustomLevel>>,

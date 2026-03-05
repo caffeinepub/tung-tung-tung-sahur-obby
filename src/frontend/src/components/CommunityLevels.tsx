@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useActor } from "../hooks/useActor";
 
 // ===================================================
@@ -13,6 +13,14 @@ interface CommunityLevelItem {
   worldWidth: number;
   bgHue: number;
   createdAt: bigint;
+}
+
+interface MyLevelItem {
+  id: bigint;
+  name: string;
+  platformsJson: string;
+  worldWidth: number;
+  bgHue: number;
 }
 
 interface CommunityLevelsProps {
@@ -40,31 +48,10 @@ export default function CommunityLevels({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!actor) return;
-    setIsLoading(true);
-    actor
-      .getPublicLevels()
-      .then((rawLevels) => {
-        const parsed: CommunityLevelItem[] = rawLevels.map((lvl) => ({
-          id: lvl.id.toString(),
-          name: lvl.name || "Unnamed Level",
-          author: lvl.author.toString(),
-          platformsJson: lvl.platformsJson,
-          worldWidth: Number(lvl.worldWidth),
-          bgHue: Number(lvl.bgHue),
-          createdAt: lvl.createdAt,
-        }));
-        // Sort newest first
-        parsed.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-        setLevels(parsed);
-        setIsLoading(false);
-      })
-      .catch(() => {
-        setError("Failed to load community levels.");
-        setIsLoading(false);
-      });
-  }, [actor]);
+  // My published levels state
+  const [myLevels, setMyLevels] = useState<MyLevelItem[]>([]);
+  const [isMyLevelsLoading, setIsMyLevelsLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<bigint | null>(null);
 
   const OWNER_USERNAME = "tung_master";
 
@@ -79,6 +66,79 @@ export default function CommunityLevels({
     const username = usernameMap?.get(principal);
     return username === OWNER_USERNAME;
   };
+
+  const loadMyLevels = useCallback(async () => {
+    if (!actor) return;
+    setIsMyLevelsLoading(true);
+    try {
+      const rawMyLevels = await actor.getMyLevels();
+      const parsed: MyLevelItem[] = rawMyLevels.map((lvl) => ({
+        id: lvl.id,
+        name: lvl.name || "Unnamed Level",
+        platformsJson: lvl.platformsJson,
+        worldWidth: Number(lvl.worldWidth),
+        bgHue: Number(lvl.bgHue),
+      }));
+      // Sort newest first
+      parsed.sort((a, b) => {
+        // id is auto-incremented so higher = newer
+        return a.id < b.id ? 1 : -1;
+      });
+      setMyLevels(parsed);
+    } catch {
+      // Silently fail — non-critical
+    } finally {
+      setIsMyLevelsLoading(false);
+    }
+  }, [actor]);
+
+  const loadPublicLevels = useCallback(async () => {
+    if (!actor) return;
+    setIsLoading(true);
+    try {
+      const rawLevels = await actor.getPublicLevels();
+      const parsed: CommunityLevelItem[] = rawLevels.map((lvl) => ({
+        id: lvl.id.toString(),
+        name: lvl.name || "Unnamed Level",
+        author: lvl.author.toString(),
+        platformsJson: lvl.platformsJson,
+        worldWidth: Number(lvl.worldWidth),
+        bgHue: Number(lvl.bgHue),
+        createdAt: lvl.createdAt,
+      }));
+      parsed.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+      setLevels(parsed);
+    } catch {
+      setError("Failed to load community levels.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [actor]);
+
+  useEffect(() => {
+    if (!actor) return;
+    void loadMyLevels();
+    void loadPublicLevels();
+  }, [actor, loadMyLevels, loadPublicLevels]);
+
+  const handleDeleteMyLevel = useCallback(
+    async (id: bigint) => {
+      if (!actor) return;
+      setDeletingId(id);
+      try {
+        await actor.deleteLevel(id);
+        // Refresh both lists after deletion
+        await Promise.all([loadMyLevels(), loadPublicLevels()]);
+      } catch {
+        // Silently fail
+      } finally {
+        setDeletingId(null);
+      }
+    },
+    [actor, loadMyLevels, loadPublicLevels],
+  );
+
+  const slotsUsed = myLevels.length;
 
   return (
     <div
@@ -166,6 +226,263 @@ export default function CommunityLevels({
           boxSizing: "border-box",
         }}
       >
+        {/* ===== MY PUBLISHED LEVELS SECTION ===== */}
+        <div
+          style={{
+            marginBottom: 32,
+          }}
+        >
+          {/* Section header */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: 12,
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  fontSize: 13,
+                  fontWeight: 800,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.1em",
+                  color: "#e879f9",
+                  marginBottom: 2,
+                }}
+              >
+                📁 My Published Levels
+              </div>
+              <div
+                style={{
+                  fontSize: 10,
+                  color: "rgba(200,180,255,0.4)",
+                }}
+              >
+                You can publish up to 2 levels
+              </div>
+            </div>
+            {/* Slot usage indicator */}
+            {!isMyLevelsLoading && (
+              <div
+                style={{
+                  padding: "4px 12px",
+                  background:
+                    slotsUsed >= 2
+                      ? "rgba(248,113,113,0.12)"
+                      : "rgba(74,222,128,0.1)",
+                  border: `1px solid ${slotsUsed >= 2 ? "rgba(248,113,113,0.35)" : "rgba(74,222,128,0.3)"}`,
+                  borderRadius: 20,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color:
+                    slotsUsed >= 2
+                      ? "rgba(248,113,113,0.9)"
+                      : "rgba(74,222,128,0.9)",
+                  letterSpacing: "0.04em",
+                }}
+              >
+                {slotsUsed}/2 slots used
+              </div>
+            )}
+          </div>
+
+          {/* Loading */}
+          {isMyLevelsLoading && (
+            <div
+              data-ocid="my_levels.loading_state"
+              style={{
+                padding: "20px",
+                textAlign: "center",
+                color: "rgba(168,85,247,0.5)",
+                fontSize: 12,
+              }}
+            >
+              Loading your levels...
+            </div>
+          )}
+
+          {/* Empty state */}
+          {!isMyLevelsLoading && myLevels.length === 0 && (
+            <div
+              data-ocid="my_levels.empty_state"
+              style={{
+                padding: "20px 24px",
+                background: "rgba(168,85,247,0.04)",
+                border: "1px dashed rgba(168,85,247,0.2)",
+                borderRadius: 10,
+                textAlign: "center",
+                color: "rgba(200,180,255,0.4)",
+                fontSize: 13,
+              }}
+            >
+              You haven't published any levels yet. Use the{" "}
+              <strong style={{ color: "rgba(168,85,247,0.7)" }}>
+                Level Editor
+              </strong>{" "}
+              to build and share your creation!
+            </div>
+          )}
+
+          {/* My level cards */}
+          {!isMyLevelsLoading && myLevels.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {myLevels.map((level, index) => {
+                const posIndex = index + 1;
+                const isDeleting = deletingId === level.id;
+                return (
+                  <div
+                    key={level.id.toString()}
+                    data-ocid={`my_levels.item.${posIndex}`}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 14,
+                      padding: "14px 18px",
+                      background: "rgba(232,121,249,0.06)",
+                      border: "1px solid rgba(232,121,249,0.2)",
+                      borderRadius: 10,
+                      transition: "border-color 0.15s",
+                      opacity: isDeleting ? 0.5 : 1,
+                    }}
+                  >
+                    {/* Hue badge */}
+                    <div
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 8,
+                        background: `linear-gradient(135deg, hsl(${level.bgHue}, 70%, 20%), hsl(${level.bgHue + 40}, 60%, 10%))`,
+                        border: `1px solid hsl(${level.bgHue}, 60%, 35%)`,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 18,
+                        flexShrink: 0,
+                      }}
+                    >
+                      ✏️
+                    </div>
+
+                    {/* Info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 800,
+                          color: "#e0d0ff",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.04em",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {level.name}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 9,
+                          color: "rgba(200,180,255,0.4)",
+                          marginTop: 3,
+                          fontFamily: "'Sora', monospace",
+                        }}
+                      >
+                        {level.worldWidth}px wide · Slot {posIndex}
+                      </div>
+                    </div>
+
+                    {/* Play button */}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onPlayLevel({
+                          name: level.name,
+                          platformsJson: level.platformsJson,
+                          worldWidth: level.worldWidth,
+                          bgHue: level.bgHue,
+                        })
+                      }
+                      disabled={isDeleting}
+                      data-ocid={`my_levels.play_button.${posIndex}`}
+                      style={{
+                        padding: "8px 16px",
+                        background: "linear-gradient(135deg, #22d3ee, #0891b2)",
+                        border: "none",
+                        borderRadius: 7,
+                        color: "#05030f",
+                        fontSize: 12,
+                        fontWeight: 800,
+                        cursor: isDeleting ? "not-allowed" : "pointer",
+                        letterSpacing: "0.05em",
+                        textTransform: "uppercase",
+                        boxShadow: "0 0 14px rgba(34,211,238,0.25)",
+                        transition: "transform 0.1s",
+                        flexShrink: 0,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      ▶ Play
+                    </button>
+
+                    {/* Delete button */}
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteMyLevel(level.id)}
+                      disabled={isDeleting}
+                      data-ocid={`my_levels.delete_button.${posIndex}`}
+                      style={{
+                        padding: "8px 14px",
+                        background: "rgba(248,113,113,0.1)",
+                        border: "1px solid rgba(248,113,113,0.3)",
+                        borderRadius: 7,
+                        color: isDeleting
+                          ? "rgba(248,113,113,0.4)"
+                          : "rgba(248,113,113,0.85)",
+                        fontSize: 12,
+                        fontWeight: 700,
+                        cursor: isDeleting ? "not-allowed" : "pointer",
+                        letterSpacing: "0.04em",
+                        textTransform: "uppercase",
+                        transition: "all 0.1s",
+                        flexShrink: 0,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {isDeleting ? "..." : "✕ Delete"}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Divider */}
+        <div
+          style={{
+            height: 1,
+            background:
+              "linear-gradient(to right, transparent, rgba(168,85,247,0.3), transparent)",
+            marginBottom: 28,
+          }}
+        />
+
+        {/* ===== COMMUNITY LEVELS SECTION ===== */}
+        <div
+          style={{
+            fontSize: 13,
+            fontWeight: 800,
+            textTransform: "uppercase",
+            letterSpacing: "0.1em",
+            color: "rgba(168,85,247,0.8)",
+            marginBottom: 14,
+          }}
+        >
+          🎮 All Community Levels
+        </div>
+
         {/* Loading state */}
         {isLoading && (
           <div

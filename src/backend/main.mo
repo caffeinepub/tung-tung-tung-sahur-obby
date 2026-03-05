@@ -9,9 +9,7 @@ import Text "mo:core/Text";
 import Nat "mo:core/Nat";
 import Int "mo:core/Int";
 import Char "mo:core/Char";
-import Migration "migration";
 
-(with migration = Migration.run)
 actor {
   type UserStats = {
     bestStage : Nat;
@@ -82,6 +80,10 @@ actor {
 
     if (not validUsername) {
       Runtime.trap("Username can only contain letters, numbers, underscores");
+    };
+
+    if (trimmed == "tung_master") {
+      Runtime.trap("Username `tung_master` is reserved and cannot be registered");
     };
 
     switch (principalToUsername.get(caller)) {
@@ -209,6 +211,15 @@ actor {
       Runtime.trap("Platforms JSON too large (max 50,000 characters)");
     };
 
+    // Check for 2 level limit
+    let existingLevelsCount = customLevelsById.values().toArray().filter(
+      func(level) { level.author == caller }
+    ).size();
+
+    if (existingLevelsCount >= 2) {
+      Runtime.trap("You already have 2 published levels. Delete one before publishing again.");
+    };
+
     let newLevel : CustomLevel = {
       id = nextLevelId;
       name = trimmedName;
@@ -223,7 +234,7 @@ actor {
     nextLevelId += 1;
   };
 
-  // Get the most recently created level by the caller
+  // Get the most recently created level by the caller (backwards compatibility)
   public query ({ caller }) func getMyLevel() : async ?CustomLevel {
     var mostRecentLevel : ?CustomLevel = null;
     var latestTime : Int = 0;
@@ -236,6 +247,15 @@ actor {
     };
 
     mostRecentLevel;
+  };
+
+  // Get all levels created by the caller (up to 2), sorted by createdAt descending
+  public query ({ caller }) func getMyLevels() : async [CustomLevel] {
+    let allLevels = customLevelsById.values().toArray();
+    let filteredLevels = allLevels.filter(
+      func(level) { level.author == caller }
+    );
+    filteredLevels.sort(CustomLevel.compareByCreatedAt);
   };
 
   // Get up to 100 newest public custom levels

@@ -1,33 +1,34 @@
 # Tung Tung Tung Sahur Obby
 
 ## Current State
-The game has a level editor and community levels system. The backend stores custom levels in a `Map<Principal, CustomLevel>`, meaning only one level can exist per user identity. When any new user publishes a level it overwrites the previous entry stored under their principal key. Since anonymous users all share the same anonymous principal, publishing overwrites the same slot every time, deleting all prior community levels.
-
-The frontend `CommunityLevels.tsx` renders levels returned by `getPublicLevels()`. The `LevelEditor.tsx` calls `saveCustomLevel()` on publish. `App.tsx` also calls `getMyLevel()` to pre-load the editor with the user's existing level.
+- Players can publish unlimited custom levels to the community pool (up to 100 shown)
+- The level editor has a single save/work-in-progress slot
+- `saveCustomLevel` stores each publish as a new entry with a unique ID
+- `getMyLevel` returns only the most recently created level by the caller
+- `deleteLevel` allows authors to delete their own levels by ID
 
 ## Requested Changes (Diff)
 
 ### Add
-- New list-based storage in the backend: `customLevelsById : Map<Nat, CustomLevel>` keyed by unique auto-increment ID, so every published level gets its own slot regardless of who published it.
-- New query `getPublicLevels()` that returns all levels sorted newest-first (up to 100).
-- New query `getLevelById(id: Nat)` to fetch a single level.
-- New update `deleteLevel(id: Nat)` that only allows the original author (or owner) to delete.
+- Backend: `getMyLevels` query -- returns all levels (up to 2) published by the caller, sorted by `createdAt` descending
+- Backend: Enforce max 2 published levels per principal in `saveCustomLevel` -- trap with "You already have 2 published levels. Delete one before publishing again." if limit is reached
+- Frontend: Level editor has 2 save slots ("Slot 1" / "Slot 2") -- player can switch between them; each slot stores its own level name, platforms, world width, bg hue independently in localStorage
+- Frontend: "My Levels" section in Community Levels screen showing the caller's 1-2 published levels with a delete button on each
+- Frontend: When publishing, show error if limit reached and prompt to delete an existing level first
 
 ### Modify
-- `saveCustomLevel` — instead of `customLevels.add(caller, newLevel)`, insert into `customLevelsById` with a new unique ID each time, so each publish creates a new entry and never overwrites existing ones.
-- `getMyLevel` — return the most recent level where `author == caller` (optional, may return null if none).
-- `deleteMyLevel` — remove the most recent level authored by caller (keep for backward-compat).
+- Backend: `saveCustomLevel` -- add count check before inserting
+- Frontend: Level editor "Save & Publish" flow -- after publish, refresh "My Levels" count so the limit is reflected immediately
+- Frontend: Community Levels screen -- display player's own published levels separately at the top with slot labels
 
 ### Remove
-- The old `Map<Principal, CustomLevel>` (`customLevels`) map.
+- Nothing removed
 
 ## Implementation Plan
-1. Replace `let customLevels = Map.empty<Principal, CustomLevel>()` with `let customLevelsById = Map.empty<Nat, CustomLevel>()`.
-2. Update `saveCustomLevel` to insert with `nextLevelId` key, then increment `nextLevelId`.
-3. Update `getPublicLevels` to iterate `customLevelsById.values()`, sort by `createdAt` descending, return up to 100.
-4. Update `getMyLevel` to filter `customLevelsById` for entries where `author == caller`, return the most recent one.
-5. Update `deleteMyLevel` to find and remove the most recent level where `author == caller`.
-6. Add `getLevelById(id: Nat)` query.
-7. Add `deleteLevel(id: Nat)` update that checks caller is the level author.
-8. Keep all other backend logic (stats, leaderboard, usernames) unchanged.
-9. Update frontend `CommunityLevels.tsx` and `App.tsx`/`LevelEditor.tsx` if any API shape changes.
+1. Update `saveCustomLevel` in `main.mo` to count caller's existing levels and trap if >= 2
+2. Add `getMyLevels` query to `main.mo` returning `[CustomLevel]` for the caller
+3. Regenerate backend (Motoko)
+4. Update frontend level editor to support 2 localStorage save slots with a toggle UI
+5. Update Community Levels screen to show "My Published Levels" section at top with delete buttons
+6. Wire publish error handling to show the limit message clearly
+7. Deploy

@@ -603,6 +603,63 @@ function GameOverScreen({
 }
 
 // ===================================================
+// STOPWATCH
+// ===================================================
+
+function formatStopwatch(ms: number): string {
+  const totalMs = Math.floor(ms);
+  const minutes = Math.floor(totalMs / 60000);
+  const seconds = Math.floor((totalMs % 60000) / 1000);
+  const centiseconds = Math.floor((totalMs % 1000) / 10);
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}.${String(centiseconds).padStart(2, "0")}`;
+}
+
+interface StopwatchProps {
+  running: boolean;
+  resetSignal: number;
+}
+
+function Stopwatch({ running, resetSignal }: StopwatchProps) {
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const stateRef = useRef({ startTime: 0, running: false, rafId: 0 });
+
+  // Unified effect: reacts to both running and resetSignal changes
+  // biome-ignore lint/correctness/useExhaustiveDependencies: resetSignal is an intentional trigger signal, not a ref
+  useEffect(() => {
+    const state = stateRef.current;
+    cancelAnimationFrame(state.rafId);
+
+    if (!running) {
+      state.running = false;
+      setElapsedMs(0);
+      return;
+    }
+
+    state.running = true;
+    state.startTime = Date.now();
+
+    const tick = () => {
+      if (!state.running) return;
+      setElapsedMs(Date.now() - state.startTime);
+      state.rafId = requestAnimationFrame(tick);
+    };
+    state.rafId = requestAnimationFrame(tick);
+
+    return () => {
+      state.running = false;
+      cancelAnimationFrame(state.rafId);
+    };
+  }, [running, resetSignal]);
+
+  return (
+    <div className="hud-stopwatch" data-ocid="hud.stopwatch_panel">
+      <span className="hud-stopwatch-label">TIME</span>
+      <span className="hud-stopwatch-value">{formatStopwatch(elapsedMs)}</span>
+    </div>
+  );
+}
+
+// ===================================================
 // HUD OVERLAY
 // ===================================================
 
@@ -614,6 +671,8 @@ interface HUDProps {
   isCustomLevel?: boolean;
   onMenu: () => void;
   username?: string | null;
+  stopwatchRunning?: boolean;
+  stopwatchResetSignal?: number;
 }
 
 function HUD({
@@ -624,19 +683,29 @@ function HUD({
   isCustomLevel,
   onMenu,
   username,
+  stopwatchRunning = false,
+  stopwatchResetSignal = 0,
 }: HUDProps) {
   return (
     <div className="game-hud">
       <div className="hud-top">
-        <button
-          type="button"
-          className="hud-menu-btn"
-          onClick={onMenu}
-          data-ocid="hud.menu_button"
-          title="Back to Menu"
-        >
-          ← Menu
-        </button>
+        <div className="hud-top-left">
+          <button
+            type="button"
+            className="hud-menu-btn"
+            onClick={onMenu}
+            data-ocid="hud.menu_button"
+            title="Back to Menu"
+          >
+            ← Menu
+          </button>
+          {!isCustomLevel && (
+            <Stopwatch
+              running={stopwatchRunning}
+              resetSignal={stopwatchResetSignal}
+            />
+          )}
+        </div>
         <div className="hud-panel hud-stage" data-ocid="hud.stage_panel">
           {isCustomLevel ? "Custom Level" : `Stage ${stage} / 10`}
         </div>
@@ -741,6 +810,10 @@ export default function App() {
 
   // Timer for speed runs
   const startTimeRef = useRef<number | null>(null);
+
+  // Stopwatch state for HUD display
+  const [stopwatchRunning, setStopwatchRunning] = useState(false);
+  const [stopwatchResetSignal, setStopwatchResetSignal] = useState(0);
 
   // Custom level state
   const [customStageToPlay, setCustomStageToPlay] =
@@ -910,6 +983,8 @@ export default function App() {
     setDrumActive(false);
     gameActiveRef.current = true;
     startTimeRef.current = Date.now();
+    setStopwatchResetSignal((s) => s + 1);
+    setStopwatchRunning(true);
   }, []);
 
   const handleDeath = useCallback((totalDeaths: number) => {
@@ -928,6 +1003,7 @@ export default function App() {
       setFinalCompletionTimeMs(0);
       setScreen("gameover");
       gameActiveRef.current = false;
+      setStopwatchRunning(false);
 
       if (actor) {
         try {
@@ -954,6 +1030,7 @@ export default function App() {
       setFinalCompletionTimeMs(elapsedMs);
       setScreen("win");
       gameActiveRef.current = false;
+      setStopwatchRunning(false);
 
       if (actor) {
         try {
@@ -973,6 +1050,7 @@ export default function App() {
 
   const handleRetry = useCallback(() => {
     setIsLoading(true);
+    setStopwatchRunning(false);
     setTimeout(() => {
       setScreen("playing");
       setStage(1);
@@ -981,6 +1059,8 @@ export default function App() {
       setDrumActive(false);
       gameActiveRef.current = true;
       startTimeRef.current = Date.now();
+      setStopwatchResetSignal((s) => s + 1);
+      setStopwatchRunning(true);
       setIsLoading(false);
     }, 100);
   }, []);
@@ -1144,9 +1224,12 @@ export default function App() {
           isCustomLevel={isCustomLevel}
           onMenu={() => {
             gameActiveRef.current = false;
+            setStopwatchRunning(false);
             setScreen("start");
           }}
           username={username}
+          stopwatchRunning={stopwatchRunning && !isCustomLevel}
+          stopwatchResetSignal={stopwatchResetSignal}
         />
       )}
 
