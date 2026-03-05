@@ -799,10 +799,10 @@ export default function App() {
   const [finalStage, setFinalStage] = useState(1);
   const [finalCompletionTimeMs, setFinalCompletionTimeMs] = useState(0);
 
-  // Username state
-  const [username, setUsername] = useState<string | null>(() => {
-    return localStorage.getItem("obby_username");
-  });
+  // Username state — do NOT pre-populate from localStorage.
+  // Always verify against the backend first so different users on the
+  // same device don't inherit a previous player's name/owner tag.
+  const [username, setUsername] = useState<string | null>(null);
   const [showUsernameModal, setShowUsernameModal] = useState(false);
   const [usernameMap, setUsernameMap] = useState<Map<string, string>>(
     new Map(),
@@ -923,15 +923,11 @@ export default function App() {
           setUsername(backendName);
           setShowUsernameModal(false);
         } else {
-          // No name in backend
-          const localName = localStorage.getItem("obby_username");
-          if (!localName) {
-            // No name anywhere — show modal
-            setShowUsernameModal(true);
-          } else {
-            // Had local but backend lost it — re-register or show modal
-            setShowUsernameModal(true);
-          }
+          // No name in backend for this identity — clear any stale local
+          // cache so a different user doesn't inherit a previous player's name
+          localStorage.removeItem("obby_username");
+          setUsername(null);
+          setShowUsernameModal(true);
         }
       } catch {
         // Silently fail — don't block gameplay
