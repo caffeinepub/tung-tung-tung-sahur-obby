@@ -5,14 +5,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 // ===================================================
 
 export interface LeaderboardEntry {
-  principal: string;
+  sessionId: string;
+  username?: string;
   totalDeaths: bigint;
   totalWins: bigint;
   bestStage: bigint;
 }
 
 export interface SpeedLeaderboardEntry {
-  principal: string;
+  sessionId: string;
+  username?: string;
   bestCompletionTimeMs: bigint;
   totalWins: bigint;
 }
@@ -37,9 +39,9 @@ export function formatTime(ms: number): string {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}.${String(millis).padStart(2, "0")}`;
 }
 
-function shortenPrincipal(principal: string): string {
-  if (principal.length <= 16) return principal;
-  return `${principal.slice(0, 8)}…${principal.slice(-4)}`;
+function shortenId(id: string): string {
+  if (id.length <= 16) return id;
+  return `${id.slice(0, 8)}…${id.slice(-4)}`;
 }
 
 // ===================================================
@@ -60,11 +62,9 @@ function RankMedal({ rank }: { rank: number }) {
 function SpeedRow({
   entry,
   rank,
-  usernameMap,
 }: {
   entry: SpeedLeaderboardEntry;
   rank: number;
-  usernameMap?: Map<string, string>;
 }) {
   const rowClass =
     rank === 0
@@ -75,16 +75,15 @@ function SpeedRow({
           ? "lb-full-row lb-full-row-bronze"
           : "lb-full-row";
 
-  const displayName =
-    usernameMap?.get(entry.principal) ?? shortenPrincipal(entry.principal);
-  const isUsername = !!usernameMap?.get(entry.principal);
+  const displayName = entry.username || shortenId(entry.sessionId);
+  const hasUsername = !!entry.username;
 
   return (
     <div className={rowClass}>
       <RankMedal rank={rank} />
       <span
-        className={isUsername ? "lb-full-username" : "lb-full-principal"}
-        title={entry.principal}
+        className={hasUsername ? "lb-full-username" : "lb-full-principal"}
+        title={entry.sessionId}
         style={
           isOwner(displayName)
             ? { color: "#22c55e", textShadow: "0 0 6px #22c55e" }
@@ -107,11 +106,9 @@ function SpeedRow({
 function TopRow({
   entry,
   rank,
-  usernameMap,
 }: {
   entry: LeaderboardEntry;
   rank: number;
-  usernameMap?: Map<string, string>;
 }) {
   const rowClass =
     rank === 0
@@ -122,16 +119,15 @@ function TopRow({
           ? "lb-full-row lb-full-row-bronze"
           : "lb-full-row";
 
-  const displayName =
-    usernameMap?.get(entry.principal) ?? shortenPrincipal(entry.principal);
-  const isUsername = !!usernameMap?.get(entry.principal);
+  const displayName = entry.username || shortenId(entry.sessionId);
+  const hasUsername = !!entry.username;
 
   return (
     <div className={rowClass}>
       <RankMedal rank={rank} />
       <span
-        className={isUsername ? "lb-full-username" : "lb-full-principal"}
-        title={entry.principal}
+        className={hasUsername ? "lb-full-username" : "lb-full-principal"}
+        title={entry.sessionId}
         style={
           isOwner(displayName)
             ? { color: "#22c55e", textShadow: "0 0 6px #22c55e" }
@@ -163,7 +159,7 @@ interface LeaderboardScreenProps {
   speedLeaderboard: SpeedLeaderboardEntry[];
   isLoading: boolean;
   onBack: () => void;
-  usernameMap?: Map<string, string>;
+  usernameMap?: Map<string, string>; // kept for API compat, unused internally
 }
 
 export default function LeaderboardScreen({
@@ -171,7 +167,6 @@ export default function LeaderboardScreen({
   speedLeaderboard,
   isLoading,
   onBack,
-  usernameMap,
 }: LeaderboardScreenProps) {
   return (
     <div className="screen-overlay lb-full-screen">
@@ -252,12 +247,7 @@ export default function LeaderboardScreen({
                       <span>Time</span>
                     </div>
                     {speedLeaderboard.map((entry, i) => (
-                      <SpeedRow
-                        key={entry.principal}
-                        entry={entry}
-                        rank={i}
-                        usernameMap={usernameMap}
-                      />
+                      <SpeedRow key={entry.sessionId} entry={entry} rank={i} />
                     ))}
                   </>
                 )}
@@ -286,12 +276,7 @@ export default function LeaderboardScreen({
                       <span>Stats</span>
                     </div>
                     {leaderboard.map((entry, i) => (
-                      <TopRow
-                        key={entry.principal}
-                        entry={entry}
-                        rank={i}
-                        usernameMap={usernameMap}
-                      />
+                      <TopRow key={entry.sessionId} entry={entry} rank={i} />
                     ))}
                   </>
                 )}

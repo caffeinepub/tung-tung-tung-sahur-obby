@@ -102,7 +102,7 @@ export default function CommunityLevels({
       const parsed: CommunityLevelItem[] = rawLevels.map((lvl) => ({
         id: lvl.id.toString(),
         name: lvl.name || "Unnamed Level",
-        author: lvl.author.toString(),
+        author: lvl.authorSession,
         platformsJson: lvl.platformsJson,
         worldWidth: Number(lvl.worldWidth),
         bgHue: Number(lvl.bgHue),

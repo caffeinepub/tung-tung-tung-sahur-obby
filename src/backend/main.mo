@@ -8,12 +8,14 @@ import Text "mo:core/Text";
 import Nat "mo:core/Nat";
 import Int "mo:core/Int";
 import Char "mo:core/Char";
-import Migration "migration";
 import Time "mo:core/Time";
 
+import List "mo:core/List";
+
 // Apply migration on upgrade using the with-clause
-(with migration = Migration.run)
+
 actor {
+  // Data types
   type UserStats = {
     bestStage : Nat;
     totalDeaths : Nat;
@@ -22,19 +24,26 @@ actor {
   };
 
   module UserStats {
-    public func compareByBestStageThenDeaths(a : (Principal, UserStats), b : (Principal, UserStats)) : Order.Order {
-      switch (Nat.compare(b.1.bestStage, a.1.bestStage)) {
-        case (#equal) { Nat.compare(a.1.totalDeaths, b.1.totalDeaths) };
+    public func compareByBestStageThenDeaths(a : UserStats, b : UserStats) : Order.Order {
+      switch (Nat.compare(b.bestStage, a.bestStage)) {
+        case (#equal) { Nat.compare(a.totalDeaths, b.totalDeaths) };
         case (order) { order };
       };
     };
 
-    public func compareByCompletionTime(a : (Principal, UserStats), b : (Principal, UserStats)) : Order.Order {
-      Nat.compare(a.1.bestCompletionTimeMs, b.1.bestCompletionTimeMs);
+    public func compareByCompletionTime(a : UserStats, b : UserStats) : Order.Order {
+      Nat.compare(a.bestCompletionTimeMs, b.bestCompletionTimeMs);
     };
   };
 
-  let stats = Map.empty<Principal, UserStats>();
+  type LeaderboardRow = {
+    sessionId : Text;
+    username : Text;
+    bestStage : Nat;
+    totalDeaths : Nat;
+    totalWins : Nat;
+    bestCompletionTimeMs : Nat;
+  };
 
   type CustomLevel = {
     id : Nat;
@@ -53,18 +62,15 @@ actor {
     };
   };
 
-  let customLevelsById = Map.empty<Nat, CustomLevel>();
-  var nextLevelId = 0;
-
-  // Username system using session IDs
+  // Storage
+  let stats = Map.empty<Text, UserStats>();
   let sessionToUsername = Map.empty<Text, Text>();
   let usernameToSession = Map.empty<Text, Text>();
-  let principalToSession = Map.empty<Principal, Text>();
+  let customLevelsById = Map.empty<Nat, CustomLevel>();
+  var nextLevelId = 0;
+  var ownerPrincipal : Text = "";
 
-  // Persistent owner principal
-  var ownerPrincipal = "";
-
-  // Username registration with session ID
+  // Username functions
   public shared ({ caller }) func registerUsername(sessionId : Text, name : Text) : async () {
     let trimmed = name.trimStart(#char(' ')).trimEnd(#char(' '));
     let len = trimmed.size();
@@ -106,7 +112,6 @@ actor {
 
     sessionToUsername.add(sessionId, trimmed);
     usernameToSession.add(trimmed, sessionId);
-    principalToSession.add(caller, sessionId); // Add the principal→session mapping
   };
 
   public query ({ caller }) func getMyUsername(sessionId : Text) : async ?Text {
@@ -124,7 +129,6 @@ actor {
 
     sessionToUsername.clear();
     usernameToSession.clear();
-    principalToSession.clear();
   };
 
   public shared ({ caller }) func resetMyUsername(sessionId : Text) : async () {
@@ -135,25 +139,17 @@ actor {
       case (?username) {
         sessionToUsername.remove(sessionId);
         usernameToSession.remove(username);
-
-        // Remove associated principal entry
-        let entries = principalToSession.entries().toArray();
-        for ((principal, _sessionId) in entries.values()) {
-          if (_sessionId == sessionId) {
-            principalToSession.remove(principal);
-          };
-        };
       };
     };
   };
 
-  // Save or update a player's game stats
-  public shared ({ caller }) func saveGameResult(stageReached : Nat, deathsThisRun : Nat, completionTimeMs : Nat) : async () {
+  // Stats functions
+  public shared ({ caller }) func saveGameResult(sessionId : Text, stageReached : Nat, deathsThisRun : Nat, completionTimeMs : Nat) : async () {
     if (stageReached < 1 or stageReached > 10) {
       Runtime.trap("Invalid stage reached. Must be between 1 and 10");
     };
 
-    let updatedStats = switch (stats.get(caller)) {
+    let updatedStats = switch (stats.get(sessionId)) {
       case (null) {
         {
           bestStage = stageReached;
@@ -187,89 +183,76 @@ actor {
       };
     };
 
-    stats.add(caller, updatedStats);
+    stats.add(sessionId, updatedStats);
   };
 
-  // Get current user's stats
-  public query ({ caller }) func getMyStats() : async ?UserStats {
-    stats.get(caller);
+  public query ({ caller }) func getMyStats(sessionId : Text) : async ?UserStats {
+    stats.get(sessionId);
   };
 
-  // Get top 100 players for leaderboard
-  public query func getLeaderboard() : async [(Principal, UserStats)] {
+  // Leaderboard functions
+  public query ({ caller }) func getLeaderboard() : async [LeaderboardRow] {
     let statsArray = stats.entries().toArray();
-    let sortedStats = statsArray.sort(UserStats.compareByBestStageThenDeaths);
-    let entriesToTake = if (sortedStats.size() < 100) { sortedStats.size() } else { 100 };
-    sortedStats.sliceToArray(0, entriesToTake);
-  };
+    let leaderboardList = List.empty<LeaderboardRow>();
 
-  // Get top 100 players for speed runs (lowest non-zero completion time)
-  public query func getSpeedLeaderboard() : async [(Principal, UserStats)] {
-    let filteredStats = stats.entries().toArray().filter(
-      func(entry) {
-        entry.1.bestCompletionTimeMs > 0;
-      }
-    );
-    let sortedStats = filteredStats.sort(UserStats.compareByCompletionTime);
-    let entriesToTake = if (sortedStats.size() < 100) { sortedStats.size() } else { 100 };
-    sortedStats.sliceToArray(0, entriesToTake);
-  };
+    for ((sessionId, stats) in statsArray.values()) {
+      let username = switch (sessionToUsername.get(sessionId)) {
+        case (?name) { name };
+        case (null) { "" };
+      };
+      leaderboardList.add({
+        sessionId;
+        username;
+        bestStage = stats.bestStage;
+        totalDeaths = stats.totalDeaths;
+        totalWins = stats.totalWins;
+        bestCompletionTimeMs = stats.bestCompletionTimeMs;
+      });
+    };
 
-  // Get leaderboard with usernames appended
-  public query ({ caller }) func getLeaderboardWithUsernames() : async [(Principal, UserStats, Text)] {
-    let statsArray = stats.entries().toArray();
-    let sortedStats = statsArray.sort(UserStats.compareByBestStageThenDeaths);
-    let entriesToTake = if (sortedStats.size() < 100) { sortedStats.size() } else { 100 };
-    let leaderboard = sortedStats.sliceToArray(0, entriesToTake);
-
-    // Map to include username
-    leaderboard.map<(Principal, UserStats), (Principal, UserStats, Text)>(
-      func((principal, stats)) {
-        let maybeSessionId = principalToSession.get(principal);
-        switch (maybeSessionId) {
-          case (null) { (principal, stats, "") };
-          case (?sessionId) {
-            let maybeUsername = sessionToUsername.get(sessionId);
-            switch (maybeUsername) {
-              case (null) { (principal, stats, "") };
-              case (?username) { (principal, stats, username) };
-            };
-          };
+    let sortedRows = leaderboardList.toArray().sort(
+      func(a, b) {
+        switch (Nat.compare(b.bestStage, a.bestStage)) {
+          case (#equal) { Nat.compare(a.totalDeaths, b.totalDeaths) };
+          case (order) { order };
         };
       }
     );
+    let rowsToTake = Nat.min(100, sortedRows.size());
+    sortedRows.sliceToArray(0, rowsToTake);
   };
 
-  // Get speed leaderboard with usernames appended
-  public query ({ caller }) func getSpeedLeaderboardWithUsernames() : async [(Principal, UserStats, Text)] {
-    let filteredStats = stats.entries().toArray().filter(
-      func(entry) {
-        entry.1.bestCompletionTimeMs > 0;
-      }
-    );
-    let sortedStats = filteredStats.sort(UserStats.compareByCompletionTime);
-    let entriesToTake = if (sortedStats.size() < 100) { sortedStats.size() } else { 100 };
-    let speedLeaderboard = sortedStats.sliceToArray(0, entriesToTake);
+  public query ({ caller }) func getSpeedLeaderboard() : async [LeaderboardRow] {
+    let statsArray = stats.entries().toArray();
+    let speedLeaderboardList = List.empty<LeaderboardRow>();
 
-    // Map to include username
-    speedLeaderboard.map<(Principal, UserStats), (Principal, UserStats, Text)>(
-      func((principal, stats)) {
-        let maybeSessionId = principalToSession.get(principal);
-        switch (maybeSessionId) {
-          case (null) { (principal, stats, "") };
-          case (?sessionId) {
-            let maybeUsername = sessionToUsername.get(sessionId);
-            switch (maybeUsername) {
-              case (null) { (principal, stats, "") };
-              case (?username) { (principal, stats, username) };
-            };
-          };
+    for ((sessionId, stats) in statsArray.values()) {
+      if (stats.bestCompletionTimeMs > 0) {
+        let username = switch (sessionToUsername.get(sessionId)) {
+          case (?name) { name };
+          case (null) { "" };
         };
+        speedLeaderboardList.add({
+          sessionId;
+          username;
+          bestStage = stats.bestStage;
+          totalDeaths = stats.totalDeaths;
+          totalWins = stats.totalWins;
+          bestCompletionTimeMs = stats.bestCompletionTimeMs;
+        });
+      };
+    };
+
+    let sortedRows = speedLeaderboardList.toArray().sort(
+      func(a, b) {
+        Nat.compare(a.bestCompletionTimeMs, b.bestCompletionTimeMs);
       }
     );
+    let rowsToTake = Nat.min(100, sortedRows.size());
+    sortedRows.sliceToArray(0, rowsToTake);
   };
 
-  // Save new custom level
+  // Custom level functions
   public shared ({ caller }) func saveCustomLevel(sessionId : Text, name : Text, platformsJson : Text, worldWidth : Nat, bgHue : Nat) : async () {
     let trimmedName = name.trimStart(#char(' ')).trimEnd(#char(' '));
     let nameLen = trimmedName.size();
@@ -335,7 +318,7 @@ actor {
   public query func getPublicLevels() : async [CustomLevel] {
     let levelsArray = customLevelsById.values().toArray();
     let sortedLevels = levelsArray.sort(CustomLevel.compareByCreatedAt);
-    let levelsToTake = if (sortedLevels.size() < 100) { sortedLevels.size() } else { 100 };
+    let levelsToTake = Nat.min(100, sortedLevels.size());
     sortedLevels.sliceToArray(0, levelsToTake);
   };
 
@@ -377,7 +360,7 @@ actor {
     };
   };
 
-  // Function to claim owner principal
+  // Owner function
   public shared ({ caller }) func claimOwnerPrincipal(secret : Text) : async Bool {
     if (secret == "tungmaster2024owner" and ownerPrincipal == "") {
       ownerPrincipal := caller.toText();

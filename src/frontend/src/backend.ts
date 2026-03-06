@@ -89,12 +89,6 @@ export class ExternalBlob {
         return this;
     }
 }
-export interface UserStats {
-    bestCompletionTimeMs: bigint;
-    totalDeaths: bigint;
-    totalWins: bigint;
-    bestStage: bigint;
-}
 export interface CustomLevel {
     id: bigint;
     worldWidth: bigint;
@@ -105,26 +99,38 @@ export interface CustomLevel {
     platformsJson: string;
     bgHue: bigint;
 }
+export interface UserStats {
+    bestCompletionTimeMs: bigint;
+    totalDeaths: bigint;
+    totalWins: bigint;
+    bestStage: bigint;
+}
+export interface LeaderboardRow {
+    username: string;
+    bestCompletionTimeMs: bigint;
+    totalDeaths: bigint;
+    totalWins: bigint;
+    bestStage: bigint;
+    sessionId: string;
+}
 export interface backendInterface {
     adminResetUsernames(secret: string): Promise<void>;
     claimOwnerPrincipal(secret: string): Promise<boolean>;
     deleteLevel(sessionId: string, id: bigint): Promise<void>;
     deleteMyLevel(sessionId: string): Promise<void>;
     getAllUsernames(): Promise<Array<[string, string]>>;
-    getLeaderboard(): Promise<Array<[Principal, UserStats]>>;
-    getLeaderboardWithUsernames(): Promise<Array<[Principal, UserStats, string]>>;
+    getLeaderboard(): Promise<Array<LeaderboardRow>>;
     getLevelById(id: bigint): Promise<CustomLevel | null>;
     getMyLevel(sessionId: string): Promise<CustomLevel | null>;
     getMyLevels(sessionId: string): Promise<Array<CustomLevel>>;
-    getMyStats(): Promise<UserStats | null>;
+    getMyStats(sessionId: string): Promise<UserStats | null>;
     getMyUsername(sessionId: string): Promise<string | null>;
     getPublicLevels(): Promise<Array<CustomLevel>>;
-    getSpeedLeaderboard(): Promise<Array<[Principal, UserStats]>>;
-    getSpeedLeaderboardWithUsernames(): Promise<Array<[Principal, UserStats, string]>>;
+    getSpeedLeaderboard(): Promise<Array<LeaderboardRow>>;
     registerUsername(sessionId: string, name: string): Promise<void>;
     resetMyUsername(sessionId: string): Promise<void>;
     saveCustomLevel(sessionId: string, name: string, platformsJson: string, worldWidth: bigint, bgHue: bigint): Promise<void>;
-    saveGameResult(stageReached: bigint, deathsThisRun: bigint, completionTimeMs: bigint): Promise<void>;
+    saveGameResult(sessionId: string, stageReached: bigint, deathsThisRun: bigint, completionTimeMs: bigint): Promise<void>;
 }
 import type { CustomLevel as _CustomLevel, UserStats as _UserStats } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
@@ -199,7 +205,7 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async getLeaderboard(): Promise<Array<[Principal, UserStats]>> {
+    async getLeaderboard(): Promise<Array<LeaderboardRow>> {
         if (this.processError) {
             try {
                 const result = await this.actor.getLeaderboard();
@@ -210,20 +216,6 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.getLeaderboard();
-            return result;
-        }
-    }
-    async getLeaderboardWithUsernames(): Promise<Array<[Principal, UserStats, string]>> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.getLeaderboardWithUsernames();
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.getLeaderboardWithUsernames();
             return result;
         }
     }
@@ -269,17 +261,17 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async getMyStats(): Promise<UserStats | null> {
+    async getMyStats(arg0: string): Promise<UserStats | null> {
         if (this.processError) {
             try {
-                const result = await this.actor.getMyStats();
+                const result = await this.actor.getMyStats(arg0);
                 return from_candid_opt_n2(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.getMyStats();
+            const result = await this.actor.getMyStats(arg0);
             return from_candid_opt_n2(this._uploadFile, this._downloadFile, result);
         }
     }
@@ -311,7 +303,7 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async getSpeedLeaderboard(): Promise<Array<[Principal, UserStats]>> {
+    async getSpeedLeaderboard(): Promise<Array<LeaderboardRow>> {
         if (this.processError) {
             try {
                 const result = await this.actor.getSpeedLeaderboard();
@@ -322,20 +314,6 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.getSpeedLeaderboard();
-            return result;
-        }
-    }
-    async getSpeedLeaderboardWithUsernames(): Promise<Array<[Principal, UserStats, string]>> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.getSpeedLeaderboardWithUsernames();
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.getSpeedLeaderboardWithUsernames();
             return result;
         }
     }
@@ -381,17 +359,17 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async saveGameResult(arg0: bigint, arg1: bigint, arg2: bigint): Promise<void> {
+    async saveGameResult(arg0: string, arg1: bigint, arg2: bigint, arg3: bigint): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.actor.saveGameResult(arg0, arg1, arg2);
+                const result = await this.actor.saveGameResult(arg0, arg1, arg2, arg3);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.saveGameResult(arg0, arg1, arg2);
+            const result = await this.actor.saveGameResult(arg0, arg1, arg2, arg3);
             return result;
         }
     }

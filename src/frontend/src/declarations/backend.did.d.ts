@@ -20,6 +20,14 @@ export interface CustomLevel {
   'platformsJson' : string,
   'bgHue' : bigint,
 }
+export interface LeaderboardRow {
+  'username' : string,
+  'bestCompletionTimeMs' : bigint,
+  'totalDeaths' : bigint,
+  'totalWins' : bigint,
+  'bestStage' : bigint,
+  'sessionId' : string,
+}
 export interface UserStats {
   'bestCompletionTimeMs' : bigint,
   'totalDeaths' : bigint,
@@ -32,29 +40,21 @@ export interface _SERVICE {
   'deleteLevel' : ActorMethod<[string, bigint], undefined>,
   'deleteMyLevel' : ActorMethod<[string], undefined>,
   'getAllUsernames' : ActorMethod<[], Array<[string, string]>>,
-  'getLeaderboard' : ActorMethod<[], Array<[Principal, UserStats]>>,
-  'getLeaderboardWithUsernames' : ActorMethod<
-    [],
-    Array<[Principal, UserStats, string]>
-  >,
+  'getLeaderboard' : ActorMethod<[], Array<LeaderboardRow>>,
   'getLevelById' : ActorMethod<[bigint], [] | [CustomLevel]>,
   'getMyLevel' : ActorMethod<[string], [] | [CustomLevel]>,
   'getMyLevels' : ActorMethod<[string], Array<CustomLevel>>,
-  'getMyStats' : ActorMethod<[], [] | [UserStats]>,
+  'getMyStats' : ActorMethod<[string], [] | [UserStats]>,
   'getMyUsername' : ActorMethod<[string], [] | [string]>,
   'getPublicLevels' : ActorMethod<[], Array<CustomLevel>>,
-  'getSpeedLeaderboard' : ActorMethod<[], Array<[Principal, UserStats]>>,
-  'getSpeedLeaderboardWithUsernames' : ActorMethod<
-    [],
-    Array<[Principal, UserStats, string]>
-  >,
+  'getSpeedLeaderboard' : ActorMethod<[], Array<LeaderboardRow>>,
   'registerUsername' : ActorMethod<[string, string], undefined>,
   'resetMyUsername' : ActorMethod<[string], undefined>,
   'saveCustomLevel' : ActorMethod<
     [string, string, string, bigint, bigint],
     undefined
   >,
-  'saveGameResult' : ActorMethod<[bigint, bigint, bigint], undefined>,
+  'saveGameResult' : ActorMethod<[string, bigint, bigint, bigint], undefined>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

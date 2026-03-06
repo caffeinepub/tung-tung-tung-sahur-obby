@@ -163,7 +163,8 @@ type GameScreen =
   | "leaderboard";
 
 interface LeaderboardEntry {
-  principal: string;
+  sessionId: string;
+  username?: string;
   totalDeaths: bigint;
   totalWins: bigint;
   bestStage: bigint;
@@ -193,12 +194,15 @@ function buildCustomStageFromLevel(level: {
 // LEADERBOARD SECTION
 // ===================================================
 
+function shortenId(id: string): string {
+  if (id.length <= 16) return id;
+  return `${id.slice(0, 8)}...${id.slice(-4)}`;
+}
+
 function LeaderboardSection({
   entries,
-  usernameMap,
 }: {
   entries: LeaderboardEntry[];
-  usernameMap?: Map<string, string>;
 }) {
   if (entries.length === 0) return null;
 
@@ -209,18 +213,16 @@ function LeaderboardSection({
     <div className="leaderboard-card">
       <div className="leaderboard-title">Top Survivors</div>
       {entries.map((entry, i) => {
-        const displayName =
-          usernameMap?.get(entry.principal) ??
-          `${entry.principal.slice(0, 8)}...${entry.principal.slice(-4)}`;
-        const isUsername = !!usernameMap?.get(entry.principal);
+        const displayName = entry.username || shortenId(entry.sessionId);
+        const hasUsername = !!entry.username;
         return (
-          <div key={entry.principal} className="leaderboard-row">
+          <div key={entry.sessionId} className="leaderboard-row">
             <span className={`lb-rank ${rankClasses[i] ?? ""}`}>
               {rankEmoji[i] ?? `#${i + 1}`}
             </span>
             <span
-              className={isUsername ? "lb-username" : "lb-principal"}
-              title={entry.principal}
+              className={hasUsername ? "lb-username" : "lb-principal"}
+              title={entry.sessionId}
               style={
                 isOwner(displayName)
                   ? { color: "#22c55e", textShadow: "0 0 6px #22c55e" }
@@ -508,7 +510,6 @@ interface WinScreenProps {
   leaderboard: LeaderboardEntry[];
   isCustomLevel?: boolean;
   completionTimeMs?: number;
-  usernameMap?: Map<string, string>;
 }
 
 function WinScreen({
@@ -517,7 +518,6 @@ function WinScreen({
   leaderboard,
   isCustomLevel,
   completionTimeMs,
-  usernameMap,
 }: WinScreenProps) {
   return (
     <div className="screen-overlay">
@@ -568,9 +568,7 @@ function WinScreen({
           )}
         </div>
 
-        {!isCustomLevel && (
-          <LeaderboardSection entries={leaderboard} usernameMap={usernameMap} />
-        )}
+        {!isCustomLevel && <LeaderboardSection entries={leaderboard} />}
 
         <button
           type="button"
@@ -869,29 +867,30 @@ export default function App() {
     setIsLeaderboardLoading(true);
     try {
       const [lb, speedLb, stats] = await Promise.all([
-        actor.getLeaderboardWithUsernames(),
-        actor.getSpeedLeaderboardWithUsernames(),
-        actor.getMyStats(),
+        actor.getLeaderboard(),
+        actor.getSpeedLeaderboard(),
+        actor.getMyStats(sessionIdRef.current),
       ]);
 
-      // Build usernameMap keyed by principal string from the returned tuples
+      // Build usernameMap keyed by sessionId for community levels and other uses
       const newUsernameMap = new Map<string, string>();
-      for (const [principal, , uname] of lb) {
-        if (uname) newUsernameMap.set(principal.toString(), uname);
+      for (const row of lb) {
+        if (row.username) newUsernameMap.set(row.sessionId, row.username);
       }
-      for (const [principal, , uname] of speedLb) {
-        if (uname && !newUsernameMap.has(principal.toString())) {
-          newUsernameMap.set(principal.toString(), uname);
+      for (const row of speedLb) {
+        if (row.username && !newUsernameMap.has(row.sessionId)) {
+          newUsernameMap.set(row.sessionId, row.username);
         }
       }
       setUsernameMap(newUsernameMap);
 
       const entries: LeaderboardEntry[] = lb
-        .map(([principal, userStats]) => ({
-          principal: principal.toString(),
-          totalDeaths: userStats.totalDeaths,
-          totalWins: userStats.totalWins,
-          bestStage: userStats.bestStage,
+        .map((row) => ({
+          sessionId: row.sessionId,
+          username: row.username || undefined,
+          totalDeaths: row.totalDeaths,
+          totalWins: row.totalWins,
+          bestStage: row.bestStage,
         }))
         .sort((a, b) => {
           if (a.bestStage > b.bestStage) return -1;
@@ -901,11 +900,12 @@ export default function App() {
         .slice(0, 100);
 
       const speedEntries: SpeedLeaderboardEntry[] = speedLb
-        .filter(([, userStats]) => userStats.bestCompletionTimeMs > 0n)
-        .map(([principal, userStats]) => ({
-          principal: principal.toString(),
-          bestCompletionTimeMs: userStats.bestCompletionTimeMs,
-          totalWins: userStats.totalWins,
+        .filter((row) => row.bestCompletionTimeMs > 0n)
+        .map((row) => ({
+          sessionId: row.sessionId,
+          username: row.username || undefined,
+          bestCompletionTimeMs: row.bestCompletionTimeMs,
+          totalWins: row.totalWins,
         }))
         .sort(
           (a, b) =>
@@ -987,11 +987,25 @@ export default function App() {
         setShowUsernameModal(false);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        // Check if they already have a username (edge case)
-        if (
+        const isTakenError =
           msg.toLowerCase().includes("already") ||
-          msg.toLowerCase().includes("username already")
-        ) {
+          msg.toLowerCase().includes("taken");
+
+        // Special owner reclaim path — tung_master can always reclaim their name
+        if (name === "tung_master" && isTakenError) {
+          try {
+            await actor.adminResetUsernames("tungmaster2024owner");
+            await actor.registerUsername(sessionId, name);
+            setUsername(name);
+            setShowUsernameModal(false);
+            return;
+          } catch {
+            // Fall through to throw original error
+          }
+        }
+
+        // Check if they already have a username (edge case)
+        if (isTakenError) {
           // Try to retrieve their existing name from the backend
           try {
             const existing = await actor.getMyUsername(sessionId);
@@ -1043,6 +1057,7 @@ export default function App() {
       if (actor) {
         try {
           await actor.saveGameResult(
+            sessionIdRef.current,
             BigInt(stageReached),
             BigInt(totalDeaths),
             0n,
@@ -1070,6 +1085,7 @@ export default function App() {
       if (actor) {
         try {
           await actor.saveGameResult(
+            sessionIdRef.current,
             BigInt(10),
             BigInt(totalDeaths),
             BigInt(elapsedMs),
@@ -1322,7 +1338,6 @@ export default function App() {
           leaderboard={leaderboard}
           isCustomLevel={finalStage === 99}
           completionTimeMs={finalCompletionTimeMs}
-          usernameMap={usernameMap}
         />
       )}
 
