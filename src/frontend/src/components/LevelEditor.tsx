@@ -9,6 +9,7 @@ interface LevelEditorProps {
   onBack: () => void;
   onTestLevel: (stage: StageConfig) => void;
   onPublish: (stage: StageConfig) => Promise<void>;
+  sessionId: string;
   existingLevel?: {
     name: string;
     platformsJson: string;
@@ -80,29 +81,45 @@ const DEFAULT_LEVEL_NAME = "My Level";
 // SLOT STORAGE HELPERS
 // ===================================================
 
-function getSlotKey(slot: EditorSlot, field: string): string {
-  return `levelEditor_slot${slot}_${field}`;
+function getSlotKey(
+  sessionId: string,
+  slot: EditorSlot,
+  field: string,
+): string {
+  return `levelEditor_${sessionId}_slot${slot}_${field}`;
 }
 
-function loadSlotData(slot: EditorSlot): SlotData {
+function loadSlotData(sessionId: string, slot: EditorSlot): SlotData {
   const name =
-    localStorage.getItem(getSlotKey(slot, "name")) ?? DEFAULT_LEVEL_NAME;
+    localStorage.getItem(getSlotKey(sessionId, slot, "name")) ??
+    DEFAULT_LEVEL_NAME;
   const platformsJson =
-    localStorage.getItem(getSlotKey(slot, "platforms")) ?? "[]";
+    localStorage.getItem(getSlotKey(sessionId, slot, "platforms")) ?? "[]";
   const worldWidth = Number(
-    localStorage.getItem(getSlotKey(slot, "worldWidth")) ?? DEFAULT_WORLD_WIDTH,
+    localStorage.getItem(getSlotKey(sessionId, slot, "worldWidth")) ??
+      DEFAULT_WORLD_WIDTH,
   );
   const bgHue = Number(
-    localStorage.getItem(getSlotKey(slot, "bgHue")) ?? DEFAULT_BG_HUE,
+    localStorage.getItem(getSlotKey(sessionId, slot, "bgHue")) ??
+      DEFAULT_BG_HUE,
   );
   return { name, platformsJson, worldWidth, bgHue };
 }
 
-function saveSlotData(slot: EditorSlot, data: SlotData) {
-  localStorage.setItem(getSlotKey(slot, "name"), data.name);
-  localStorage.setItem(getSlotKey(slot, "platforms"), data.platformsJson);
-  localStorage.setItem(getSlotKey(slot, "worldWidth"), String(data.worldWidth));
-  localStorage.setItem(getSlotKey(slot, "bgHue"), String(data.bgHue));
+function saveSlotData(sessionId: string, slot: EditorSlot, data: SlotData) {
+  localStorage.setItem(getSlotKey(sessionId, slot, "name"), data.name);
+  localStorage.setItem(
+    getSlotKey(sessionId, slot, "platforms"),
+    data.platformsJson,
+  );
+  localStorage.setItem(
+    getSlotKey(sessionId, slot, "worldWidth"),
+    String(data.worldWidth),
+  );
+  localStorage.setItem(
+    getSlotKey(sessionId, slot, "bgHue"),
+    String(data.bgHue),
+  );
 }
 
 // ===================================================
@@ -355,20 +372,23 @@ export default function LevelEditor({
   onBack,
   onTestLevel,
   onPublish,
+  sessionId,
   existingLevel,
 }: LevelEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animRef = useRef<number>(0);
 
-  // Active slot state
+  // Active slot state — scoped to this session
   const [activeSlot, setActiveSlot] = useState<EditorSlot>(() => {
-    const saved = localStorage.getItem("levelEditor_activeSlot");
+    const saved = localStorage.getItem(`levelEditor_${sessionId}_activeSlot`);
     return saved === "2" ? 2 : 1;
   });
 
   // Load initial slot data — prefer existingLevel for slot 1 on first load
   const [platforms, setPlatforms] = useState<Platform[]>(() => {
-    const slot1HasData = localStorage.getItem("levelEditor_slot1_platforms");
+    const slot1HasData = localStorage.getItem(
+      getSlotKey(sessionId, 1, "platforms"),
+    );
     if (!slot1HasData && existingLevel) {
       // Migrate existingLevel into slot 1
       try {
@@ -377,7 +397,7 @@ export default function LevelEditor({
         return [];
       }
     }
-    const slotData = loadSlotData(1);
+    const slotData = loadSlotData(sessionId, 1);
     try {
       return JSON.parse(slotData.platformsJson) as Platform[];
     } catch {
@@ -386,27 +406,33 @@ export default function LevelEditor({
   });
 
   const [levelName, setLevelName] = useState<string>(() => {
-    const slot1HasData = localStorage.getItem("levelEditor_slot1_platforms");
+    const slot1HasData = localStorage.getItem(
+      getSlotKey(sessionId, 1, "platforms"),
+    );
     if (!slot1HasData && existingLevel) {
       return existingLevel.name;
     }
-    return loadSlotData(1).name;
+    return loadSlotData(sessionId, 1).name;
   });
 
   const [worldWidth, setWorldWidth] = useState<number>(() => {
-    const slot1HasData = localStorage.getItem("levelEditor_slot1_platforms");
+    const slot1HasData = localStorage.getItem(
+      getSlotKey(sessionId, 1, "platforms"),
+    );
     if (!slot1HasData && existingLevel) {
       return existingLevel.worldWidth;
     }
-    return loadSlotData(1).worldWidth;
+    return loadSlotData(sessionId, 1).worldWidth;
   });
 
   const [bgHue, setBgHue] = useState<number>(() => {
-    const slot1HasData = localStorage.getItem("levelEditor_slot1_platforms");
+    const slot1HasData = localStorage.getItem(
+      getSlotKey(sessionId, 1, "platforms"),
+    );
     if (!slot1HasData && existingLevel) {
       return existingLevel.bgHue;
     }
-    return loadSlotData(1).bgHue;
+    return loadSlotData(sessionId, 1).bgHue;
   });
 
   const [selectedType, setSelectedType] = useState<PlatformType>("static");
@@ -448,13 +474,13 @@ export default function LevelEditor({
 
   // Auto-save current slot to localStorage whenever data changes
   useEffect(() => {
-    saveSlotData(activeSlot, {
+    saveSlotData(sessionId, activeSlot, {
       name: levelName,
       platformsJson: JSON.stringify(platforms),
       worldWidth,
       bgHue,
     });
-  }, [activeSlot, levelName, platforms, worldWidth, bgHue]);
+  }, [sessionId, activeSlot, levelName, platforms, worldWidth, bgHue]);
 
   // ===================================================
   // SLOT SWITCHING
@@ -465,7 +491,7 @@ export default function LevelEditor({
       if (newSlot === activeSlot) return;
 
       // Save current slot state first
-      saveSlotData(activeSlot, {
+      saveSlotData(sessionId, activeSlot, {
         name: levelName,
         platformsJson: JSON.stringify(platformsRef.current),
         worldWidth: worldWidthRef.current,
@@ -473,7 +499,7 @@ export default function LevelEditor({
       });
 
       // Load new slot data
-      const newData = loadSlotData(newSlot);
+      const newData = loadSlotData(sessionId, newSlot);
       let newPlatforms: Platform[] = [];
       try {
         newPlatforms = JSON.parse(newData.platformsJson) as Platform[];
@@ -482,7 +508,10 @@ export default function LevelEditor({
       }
 
       setActiveSlot(newSlot);
-      localStorage.setItem("levelEditor_activeSlot", String(newSlot));
+      localStorage.setItem(
+        `levelEditor_${sessionId}_activeSlot`,
+        String(newSlot),
+      );
       setPlatforms(newPlatforms);
       setLevelName(newData.name);
       setWorldWidth(newData.worldWidth);
@@ -493,7 +522,7 @@ export default function LevelEditor({
       setError(null);
       setPublishSuccess(false);
     },
-    [activeSlot, levelName],
+    [sessionId, activeSlot, levelName],
   );
 
   const buildStage = useCallback(

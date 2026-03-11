@@ -568,7 +568,9 @@ function WinScreen({
           )}
         </div>
 
-        {!isCustomLevel && <LeaderboardSection entries={leaderboard} />}
+        {!isCustomLevel && (
+          <LeaderboardSection entries={leaderboard.slice(0, 5)} />
+        )}
 
         <button
           type="button"
@@ -1252,6 +1254,7 @@ export default function App() {
           onBack={() => setScreen("start")}
           onTestLevel={handleEditorTest}
           onPublish={handleEditorPublish}
+          sessionId={sessionIdRef.current}
           existingLevel={userExistingLevel}
         />
       )}
